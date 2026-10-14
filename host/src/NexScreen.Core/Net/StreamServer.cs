@@ -43,7 +43,7 @@ internal sealed class StreamServer
 
                 if (sessionTask is not null)
                 {
-                    Log.Info("Reemplazando la sesión anterior");
+                    if (!sessionTask.IsCompleted) Log.Info("Reemplazando la sesión anterior");
                     await sessionCts!.CancelAsync().ConfigureAwait(false);
                     await sessionTask.ConfigureAwait(false);
                     sessionCts.Dispose();
