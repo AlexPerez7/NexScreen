@@ -21,6 +21,20 @@ internal static class StartupRegistration
         }
     }
 
+    /// <summary>
+    /// El inicio automático está activo pero apunta a otro NexScreen.exe (por ejemplo, una versión
+    /// de desarrollo o una instalación movida).
+    /// </summary>
+    public static bool PointsElsewhere
+    {
+        get
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunKey);
+            return key?.GetValue(ValueName) is string value
+                   && !value.Contains(Environment.ProcessPath!, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     public static void Set(bool enabled)
     {
         using var key = Registry.CurrentUser.CreateSubKey(RunKey);

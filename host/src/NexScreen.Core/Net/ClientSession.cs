@@ -201,7 +201,7 @@ internal sealed class ClientSession
     private async Task StreamVideoAsync(MessageChannel channel, Func<int> resolveMonitor, int maxWidth, int maxHeight, CancellationToken ct)
     {
         EncoderKind[] encoders = _options.Encoder == EncoderKind.Auto
-            ? [EncoderKind.Qsv, EncoderKind.X264]
+            ? [EncoderKind.Qsv, EncoderKind.Mf, EncoderKind.X264]
             : [_options.Encoder];
 
         var encoderIndex = 0;

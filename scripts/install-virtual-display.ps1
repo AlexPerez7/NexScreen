@@ -18,11 +18,22 @@
 #>
 #Requires -RunAsAdministrator
 param(
-    [switch]$Uninstall
+    [switch]$Uninstall,
+
+    # Zips ya descargados (el instalador los incluye): se verifican igual que si se descargaran.
+    [string]$DriverZip,
+    [string]$NefconZip,
+
+    # Si se indica, todo lo que muestra el script queda en este archivo (el instalador lo corre oculto).
+    [string]$LogPath
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+if ($LogPath) {
+    New-Item -ItemType Directory -Force (Split-Path $LogPath) | Out-Null
+    Start-Transcript -Path $LogPath -Append | Out-Null
+}
 
 $DriverUrl = 'https://github.com/VirtualDrivers/Virtual-Display-Driver/releases/download/25.7.23/VirtualDisplayDriver-x86.Driver.Only.zip'
 $DriverSha256 = 'E24210692B442B39AF763536330CE78B423F19342B7A7792C26DE3944E418B3A'
@@ -33,9 +44,13 @@ $HardwareId = 'Root\MttVDD'
 $DisplayClassGuid = '4d36e968-e325-11ce-bfc1-08002be10318'
 $ConfigDir = 'C:\VirtualDisplayDriver'
 
-function Get-VerifiedArchive([string]$Url, [string]$Sha256, [string]$Destination) {
+function Get-VerifiedArchive([string]$Url, [string]$Sha256, [string]$Destination, [string]$LocalZip) {
     $zip = "$Destination.zip"
-    Invoke-WebRequest -Uri $Url -OutFile $zip -UseBasicParsing
+    if ($LocalZip) {
+        Copy-Item $LocalZip $zip
+    } else {
+        Invoke-WebRequest -Uri $Url -OutFile $zip -UseBasicParsing
+    }
     $actual = (Get-FileHash $zip -Algorithm SHA256).Hash
     if ($actual -ne $Sha256) { throw "Hash inválido para $Url`n  esperado $Sha256`n  obtenido $actual" }
     Expand-Archive -Path $zip -DestinationPath $Destination -Force
@@ -48,11 +63,21 @@ function Assert-Signed([string]$Path, [string]$ExpectedSigner) {
     }
 }
 
+function Get-VirtualDisplayDevice {
+    Get-PnpDevice -Class Display -ErrorAction SilentlyContinue | Where-Object { $_.HardwareID -contains $HardwareId }
+}
+
+if (-not $Uninstall -and (Get-VirtualDisplayDevice)) {
+    Write-Host 'El monitor virtual ya está instalado; no hay nada que hacer.' -ForegroundColor Green
+    if ($LogPath) { Stop-Transcript | Out-Null }
+    return
+}
+
 $work = Join-Path $env:TEMP "nexscreen-vdd-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $work | Out-Null
 try {
-    Write-Host 'Descargando nefcon...' -ForegroundColor Cyan
-    Get-VerifiedArchive $NefconUrl $NefconSha256 (Join-Path $work 'nefcon')
+    Write-Host 'Preparando nefcon...' -ForegroundColor Cyan
+    Get-VerifiedArchive $NefconUrl $NefconSha256 (Join-Path $work 'nefcon') $NefconZip
     $nefcon = Join-Path $work 'nefcon\x64\nefconc.exe'
     Assert-Signed $nefcon 'Nefarius Software Solutions'
 
@@ -64,8 +89,8 @@ try {
         return
     }
 
-    Write-Host 'Descargando Virtual Display Driver...' -ForegroundColor Cyan
-    Get-VerifiedArchive $DriverUrl $DriverSha256 (Join-Path $work 'vdd')
+    Write-Host 'Preparando Virtual Display Driver...' -ForegroundColor Cyan
+    Get-VerifiedArchive $DriverUrl $DriverSha256 (Join-Path $work 'vdd') $DriverZip
     $driverDir = Join-Path $work 'vdd\VirtualDisplayDriver'
     $catalog = Join-Path $driverDir 'mttvdd.cat'
     Assert-Signed $catalog 'SignPath Foundation'
@@ -137,10 +162,11 @@ try {
         Pop-Location
     }
 
-    $device = Get-PnpDevice -Class Display -ErrorAction SilentlyContinue | Where-Object { $_.HardwareID -contains $HardwareId }
+    $device = Get-VirtualDisplayDevice
     if (-not $device) { throw 'El driver se instaló pero no aparece el dispositivo Root\MttVDD' }
     Write-Host "Listo: $($device.FriendlyName) [$($device.Status)]" -ForegroundColor Green
     if ($LASTEXITCODE -eq 3010) { Write-Host 'Windows pide reiniciar para terminar la instalación.' -ForegroundColor Yellow }
 } finally {
     Remove-Item -Path $work -Recurse -Force -ErrorAction SilentlyContinue
+    if ($LogPath) { Stop-Transcript | Out-Null }
 }

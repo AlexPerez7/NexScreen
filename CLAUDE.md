@@ -20,7 +20,7 @@ NexScreen convierte una tablet Android (desarrollado con una Samsung Galaxy Tab 
 | 1 | Espejo de un monitor → tablet | ✅ |
 | 2 | Monitor virtual para extender el escritorio | ✅ |
 | 3 | Táctil y S Pen (presión) hacia Windows | ✅ |
-| 4 | App de bandeja, autoconexión, instalador, releases | En curso (4a ✅, 4b USB ✅, 4c WiFi ✅, 4d escala ✅) |
+| 4 | App de bandeja, autoconexión, instalador, releases | En curso (4a-4e ✅; falta 4f releases) |
 
 Plan de la fase 4: 4a app de bandeja · 4b autoconexión USB · 4c descubrimiento WiFi ·
 4d escala automática · 4e instalador (Inno Setup) · 4f releases con GitHub Actions + APK firmado.
@@ -150,6 +150,22 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
   verificar que reciba el clic.
 - Las pruebas con `fake_client.py` agregan el monitor virtual aunque la tablet no esté conectada:
   avisarle al usuario, porque ve aparecer y desaparecer una pantalla.
+
+## Instalador (fase 4e)
+
+- `installer\build.ps1` publica la bandeja y la consola (self-contained win-x64), descarga con
+  caché (`installer\.cache`) y SHA-256 fijo ffmpeg LGPL 9.0.2, adb r37.0.1, el driver y nefcon,
+  arma `installer\staging\app` y compila `installer\nexscreen.iss` → `dist\NexScreen-Setup-<v>.exe`.
+- La versión sale de `host\Directory.Build.props` (o `-Version`). El `AppId` del .iss no se cambia.
+- **ffmpeg del instalador es LGPL (sin x264)**: el respaldo de Quick Sync es Media Foundation
+  (`h264_mf`, `-scenario display_remoting`). x264 queda solo si el ffmpeg lo trae (desarrollo).
+- El instalador corre como admin (puede ser otra cuenta): no escribe en HKCU. "Iniciar con
+  Windows" lo activa la bandeja la primera vez (`AppSettings.StartupConfigured`) y la reapunta si
+  quedó apuntando a otro exe (por ejemplo, el de desarrollo).
+- Instalado en `C:\Program Files\NexScreen`. Log del driver: `C:\ProgramData\NexScreen\install-virtual-display.log`.
+  Desinstalar quita también las reglas del firewall y el monitor virtual.
+- **En el PC del usuario ya está instalada la versión 0.4.0**: para probar cambios del código hay
+  que cerrar el NexScreen instalado (usa el mismo puerto).
 
 ## Protocolo
 

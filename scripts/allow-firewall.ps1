@@ -7,10 +7,19 @@
 #Requires -RunAsAdministrator
 param(
     [int]$Port = 27190,
-    [int]$DiscoveryPort = 27191
+    [int]$DiscoveryPort = 27191,
+
+    # Quita las reglas (lo usa el desinstalador).
+    [switch]$Remove
 )
 
 $ErrorActionPreference = 'Stop'
+if ($Remove) {
+    Get-NetFirewallRule -DisplayName 'NexScreen', 'NexScreen (descubrimiento)' -ErrorAction SilentlyContinue |
+        Remove-NetFirewallRule
+    Write-Host 'Reglas de NexScreen quitadas del firewall.' -ForegroundColor Green
+    return
+}
 $rules = @(
     @{ Name = 'NexScreen'; Protocol = 'TCP'; Port = $Port; Description = 'Video e input hacia la tablet (NexScreen)' },
     @{ Name = 'NexScreen (descubrimiento)'; Protocol = 'UDP'; Port = $DiscoveryPort; Description = 'La tablet encuentra el PC en la red (NexScreen)' }

@@ -39,6 +39,20 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
 
     public TrayContext()
     {
+        if (!_settings.StartupConfigured)
+        {
+            StartupRegistration.Set(true);
+            _settings.StartupConfigured = true;
+            _settings.Save();
+            Log.Info("NexScreen se configuró para iniciar con Windows");
+        }
+        else if (StartupRegistration.PointsElsewhere)
+        {
+            // El usuario quiere iniciar con Windows: que sea con este NexScreen.exe.
+            StartupRegistration.Set(true);
+            Log.Info($"Inicio con Windows actualizado a {Environment.ProcessPath}");
+        }
+
         _startWithWindows = new ToolStripMenuItem("Iniciar con Windows", null, (_, _) => ToggleStartWithWindows())
         {
             Checked = StartupRegistration.IsEnabled,

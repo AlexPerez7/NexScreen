@@ -61,6 +61,22 @@ public class HostOptionsTests
         Assert.Equal(ScreenMode.Mirror, options.Mode);
     }
 
+    [Fact]
+    public void BuildsMediaFoundationPipelineForDisplayRemoting()
+    {
+        var args = FfmpegVideoSource.BuildArguments(new VideoSourceSettings(0, 60, 12, 2304, 1440, EncoderKind.Mf));
+
+        Assert.Contains("h264_mf", args);
+        Assert.Equal("display_remoting", args[args.ToList().IndexOf("-scenario") + 1]);
+        Assert.Contains(",hwdownload,format=bgra,", args[args.ToList().IndexOf("-i") + 1]);
+    }
+
+    [Fact]
+    public void ParsesMediaFoundationEncoder()
+    {
+        Assert.Equal(EncoderKind.Mf, HostOptions.Parse(["--encoder", "mf"]).Encoder);
+    }
+
     [Theory]
     [InlineData("--mode", "2")]
     [InlineData("--position", "middle")]

@@ -8,6 +8,11 @@ internal enum EncoderKind
 {
     Auto,
     Qsv,
+
+    /// <summary>Media Foundation por software: viene con Windows, está siempre disponible.</summary>
+    Mf,
+
+    /// <summary>Solo si el ffmpeg incluye libx264 (las builds GPL; el instalador trae una LGPL).</summary>
     X264,
 }
 
@@ -31,7 +36,8 @@ internal sealed class HostOptions
           --monitor <n>     Al espejar: índice del monitor a capturar, orden DXGI (por defecto 0)
           --fps <n>         Cuadros por segundo (por defecto 60)
           --bitrate <n>     Bitrate en Mbps (por defecto 12)
-          --encoder <e>     auto | qsv | x264 (por defecto auto: Quick Sync con fallback a x264)
+          --encoder <e>     auto | qsv | mf | x264 (por defecto auto: Quick Sync, si no Media
+                            Foundation, si no x264)
           --ffmpeg <ruta>   Ruta a ffmpeg.exe (por defecto se busca en PATH)
           --scale <n>       Escala de Windows para la tablet al extender: 100, 125, 150, 175, 200...
                             (por defecto no se cambia)

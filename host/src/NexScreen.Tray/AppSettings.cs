@@ -40,6 +40,13 @@ internal sealed class AppSettings
 
     public int Port { get; set; } = Wire.DefaultPort;
 
+    /// <summary>
+    /// La primera vez que se abre, NexScreen se activa para iniciar con Windows. Lo hace la app y no
+    /// el instalador porque el instalador corre como administrador (puede ser otra cuenta) y no
+    /// puede escribir en el registro del usuario. Después se respeta lo que elija el usuario.
+    /// </summary>
+    public bool StartupConfigured { get; set; }
+
     public static int BitrateMbps(Quality quality) => quality switch
     {
         Quality.High => 20,

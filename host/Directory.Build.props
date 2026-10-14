@@ -8,6 +8,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Solo los recursos en español de .NET (evita carpetas de/fr/ja... en el instalador). -->
+    <SatelliteResourceLanguages>es</SatelliteResourceLanguages>
     <Company>NexScreen</Company>
     <Product>NexScreen</Product>
   </PropertyGroup>

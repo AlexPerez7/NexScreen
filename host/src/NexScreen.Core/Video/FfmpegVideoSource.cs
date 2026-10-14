@@ -27,7 +27,12 @@ internal sealed class FfmpegVideoSource : IVideoSource
     private FfmpegVideoSource(Process process, EncoderKind encoder)
     {
         _process = process;
-        Name = encoder == EncoderKind.Qsv ? "Quick Sync (h264_qsv)" : "x264 (CPU)";
+        Name = encoder switch
+        {
+            EncoderKind.Qsv => "Quick Sync (h264_qsv)",
+            EncoderKind.Mf => "Media Foundation (h264_mf)",
+            _ => "x264 (CPU)",
+        };
     }
 
     public string Name { get; }
@@ -110,6 +115,18 @@ internal sealed class FfmpegVideoSource : IVideoSource
                 "-async_depth", "1",
                 "-look_ahead", "0",
                 "-forced_idr", "1",
+            ]);
+        }
+        else if (s.Encoder == EncoderKind.Mf)
+        {
+            args.Add($"{capture},hwdownload,format=bgra,scale=w={width}:h={height}:flags=bilinear,format=nv12");
+            args.AddRange([
+                "-c:v", "h264_mf",
+                // Por software: el MFT de hardware puede no existir; este está en todo Windows.
+                "-hw_encoding", "0",
+                // Modo de Windows pensado para escritorio remoto: baja latencia.
+                "-scenario", "display_remoting",
+                "-rate_control", "cbr",
             ]);
         }
         else

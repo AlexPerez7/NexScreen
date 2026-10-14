@@ -20,3 +20,8 @@ captures/
 # Varios
 *.h264
 *.log
+
+# Instalador
+installer/.cache/
+installer/staging/
+dist/
