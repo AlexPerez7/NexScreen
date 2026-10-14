@@ -20,7 +20,7 @@ NexScreen convierte una tablet Android (desarrollado con una Samsung Galaxy Tab 
 | 1 | Espejo de un monitor → tablet | ✅ |
 | 2 | Monitor virtual para extender el escritorio | ✅ |
 | 3 | Táctil y S Pen (presión) hacia Windows | ✅ |
-| 4 | App de bandeja, autoconexión, instalador, releases | En curso (4a bandeja ✅) |
+| 4 | App de bandeja, autoconexión, instalador, releases | En curso (4a bandeja ✅, 4b USB ✅) |
 
 Plan de la fase 4: 4a app de bandeja · 4b autoconexión USB · 4c descubrimiento WiFi ·
 4d escala automática · 4e instalador (Inno Setup) · 4f releases con GitHub Actions + APK firmado.
@@ -89,6 +89,12 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 
 ## Trampas conocidas del entorno
 
+- **Antes de diagnosticar una captura que no arranca, verificar que la sesión no esté bloqueada**:
+  `nexscreen-host.exe --list-displays` muestra "Sesión de Windows bloqueada" en la primera línea.
+  Con la pantalla de bloqueo, Desktop Duplication devuelve "access denied" o se cuelga sin error, y
+  la captura GDI sale negra. En Windows 10/11 la pantalla de bloqueo se dibuja en el escritorio
+  "Default": se detecta con `WTSQuerySessionInformation` (`SessionLock.cs`), no con `OpenInputDesktop`.
+  Una vez se perdió mucho tiempo persiguiendo un "bug" que era el PC bloqueado.
 - **Desktop Duplication devuelve "access denied"** desde las tareas en segundo plano de Claude Code
   (`run_in_background`), servicios o con la sesión bloqueada. El host siempre se lanza con
   `Start-Process` en la sesión del usuario.

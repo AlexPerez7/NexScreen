@@ -29,6 +29,24 @@ class MainActivity : AppCompatActivity() {
         binding.hostInput.setOnEditorActionListener { _, actionId, _ ->
             (actionId == EditorInfo.IME_ACTION_GO).also { if (it) connectWifi() }
         }
+
+        if (savedInstanceState == null) handleAutoConnect(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleAutoConnect(intent)
+    }
+
+    /**
+     * El host abre la app con este extra al detectar la tablet por USB
+     * (`am start ... --es dev.nexscreen.client.AUTO_CONNECT usb`): conectar sin tocar nada.
+     */
+    private fun handleAutoConnect(intent: Intent?) {
+        if (intent?.getStringExtra(EXTRA_AUTO_CONNECT) != "usb") return
+        intent.removeExtra(EXTRA_AUTO_CONNECT)
+        connect(USB_HOST)
     }
 
     private fun connectWifi() {
@@ -62,6 +80,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private companion object {
+        const val EXTRA_AUTO_CONNECT = "dev.nexscreen.client.AUTO_CONNECT"
         const val USB_HOST = "127.0.0.1"
         const val KEY_HOST = "host"
         const val KEY_PORT = "port"

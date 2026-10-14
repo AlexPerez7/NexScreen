@@ -33,6 +33,7 @@ internal sealed class HostOptions
           --bitrate <n>     Bitrate en Mbps (por defecto 12)
           --encoder <e>     auto | qsv | x264 (por defecto auto: Quick Sync con fallback a x264)
           --ffmpeg <ruta>   Ruta a ffmpeg.exe (por defecto se busca en PATH)
+          --no-usb          No detectar tablets por USB (por defecto arma el túnel y abre la app sola)
           --list-displays   Lista pantallas y salidas DXGI, y termina
           --verbose         Log detallado
           --help            Muestra esta ayuda
@@ -50,6 +51,9 @@ internal sealed class HostOptions
     public bool Verbose { get; set; }
     public bool ShowHelp { get; set; }
     public bool ListDisplays { get; set; }
+
+    /// <summary>Detectar tablets por USB, armar el túnel y abrir la app (requiere adb).</summary>
+    public bool UsbAutoConnect { get; set; } = true;
 
     public static HostOptions Parse(IReadOnlyList<string> args)
     {
@@ -85,6 +89,9 @@ internal sealed class HostOptions
                     break;
                 case "--list-displays":
                     options.ListDisplays = true;
+                    break;
+                case "--no-usb":
+                    options.UsbAutoConnect = false;
                     break;
                 case "--verbose":
                     options.Verbose = true;

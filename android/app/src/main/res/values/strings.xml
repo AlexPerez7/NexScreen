@@ -12,4 +12,6 @@
     <string name="status_connecting">Conectando a %1$s:%2$d…</string>
     <string name="status_waiting_video">Esperando video…</string>
     <string name="disconnected">Desconectado: %1$s</string>
+    <string name="status_reconnecting">Reconectando…</string>
+    <string name="reason_host_closed">el PC cerró la conexión</string>
 </resources>

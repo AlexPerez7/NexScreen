@@ -2,6 +2,7 @@ using System.Diagnostics;
 using NexScreen.Core;
 using NexScreen.Core.Display;
 using NexScreen.Core.Net;
+using NexScreen.Core.Usb;
 
 namespace NexScreen.Tray;
 
@@ -10,7 +11,7 @@ namespace NexScreen.Tray;
 /// y permite cambiar las preferencias. Los eventos del servidor llegan desde hilos de fondo y se
 /// pasan al hilo de la interfaz.
 /// </summary>
-internal sealed class TrayContext : ApplicationContext, IStreamObserver
+internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObserver
 {
     private static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(5);
 
@@ -23,6 +24,13 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver
 
     private CancellationTokenSource? _serverCts;
     private Task? _serverTask;
+    private volatile StreamServer? _server;
+
+    // La autoconexión USB vive mientras viva la bandeja (no se reinicia con el servidor): así no
+    // vuelve a abrir la app en una tablet que ya estaba enchufada y se está reconectando sola.
+    private readonly CancellationTokenSource _appCts = new();
+    private UsbAutoConnector? _usb;
+    private Task _usbTask = Task.CompletedTask;
     private string? _device;
     private bool _exiting;
 
@@ -40,6 +48,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver
         menu.Items.Add(PositionMenu());
         menu.Items.Add(QualityMenu());
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(new ToolStripMenuItem("Abrir NexScreen en la tablet (USB)", null, async (_, _) => await ConnectUsbNowAsync()));
         menu.Items.Add(_startWithWindows);
         menu.Items.Add(new ToolStripMenuItem("Abrir el registro", null, (_, _) => OpenLog()));
         menu.Items.Add(new ToolStripSeparator());
@@ -140,11 +149,14 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver
         var cts = new CancellationTokenSource();
         _serverCts = cts;
         SetState(TrayState.Waiting, "Esperando la tablet");
+
+        var server = new StreamServer(options, this);
+        _server = server;
         _serverTask = Task.Run(async () =>
         {
             try
             {
-                await new StreamServer(options, this).RunAsync(cts.Token);
+                await server.RunAsync(cts.Token);
             }
             catch (Exception ex) when (!cts.IsCancellationRequested)
             {
@@ -156,6 +168,47 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver
                 }, null);
             }
         });
+
+        if (_usb is null) StartUsbAutoConnect(options.Port);
+    }
+
+    private void StartUsbAutoConnect(int port)
+    {
+        var adbPath = ToolLocator.Find("adb");
+        if (!ToolLocator.Runs(adbPath, "version"))
+        {
+            Log.Warn("No se encontró adb: la autoconexión USB está desactivada");
+            return;
+        }
+
+        var usb = new UsbAutoConnector(
+            new AdbClient(adbPath), port, () => _server?.HasActiveSession ?? false, this, ToolLocator.BundledApk());
+        _usb = usb;
+        _usbTask = Task.Run(async () =>
+        {
+            try
+            {
+                await usb.RunAsync(_appCts.Token);
+            }
+            catch (OperationCanceledException) when (_appCts.IsCancellationRequested)
+            {
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"La autoconexión USB se detuvo: {ex}");
+            }
+        });
+    }
+
+    private async Task ConnectUsbNowAsync()
+    {
+        if (_usb is null)
+        {
+            _notifyIcon.ShowBalloonTip(5_000, "NexScreen", "La autoconexión USB no está disponible (no se encontró adb).", ToolTipIcon.Warning);
+            return;
+        }
+
+        await Task.Run(() => _usb.ConnectNowAsync(CancellationToken.None));
     }
 
     private async Task StopServerAsync()
@@ -165,7 +218,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver
         // Esperar a que la sesión quite el monitor virtual antes de seguir.
         await Task.WhenAny(_serverTask, Task.Delay(StopTimeout));
         _serverCts.Dispose();
-        (_serverCts, _serverTask) = (null, null);
+        (_serverCts, _serverTask, _server) = (null, null, null);
     }
 
     private async Task RestartServerAsync()
@@ -180,7 +233,9 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver
         if (_exiting) return;
         _exiting = true;
         _notifyIcon.Visible = false;
+        await _appCts.CancelAsync();
         await StopServerAsync();
+        await Task.WhenAny(_usbTask, Task.Delay(StopTimeout));
         _notifyIcon.Dispose();
         _icons.Dispose();
         ExitThread();
@@ -229,6 +284,23 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver
         }
     }, null);
 
+    void IUsbObserver.OnTabletLaunched(string device) => _ui.Post(_ =>
+    {
+        if (_device is null) SetState(TrayState.Waiting, $"Abriendo NexScreen en {device}…");
+    }, null);
+
+    void IUsbObserver.OnTabletUnauthorized(string device) => _ui.Post(_ =>
+        _notifyIcon.ShowBalloonTip(10_000, "Autoriza la depuración USB",
+            $"En la pantalla de {device} acepta \"Permitir depuración USB\" (marca \"Permitir siempre\").",
+            ToolTipIcon.Warning), null);
+
+    void IUsbObserver.OnAppMissing(string device) => _ui.Post(_ =>
+        _notifyIcon.ShowBalloonTip(10_000, "Falta la app en la tablet",
+            $"Instala la app NexScreen en {device} para usarla como monitor.", ToolTipIcon.Warning), null);
+
+    void IUsbObserver.OnUsbError(string message) => _ui.Post(_ =>
+        _notifyIcon.ShowBalloonTip(8_000, "Problema con la conexión USB", message, ToolTipIcon.Warning), null);
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
@@ -236,6 +308,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver
             _notifyIcon.Dispose();
             _icons.Dispose();
             _serverCts?.Dispose();
+            _appCts.Dispose();
         }
 
         base.Dispose(disposing);

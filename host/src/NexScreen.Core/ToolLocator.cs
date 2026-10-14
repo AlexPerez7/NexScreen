@@ -14,7 +14,25 @@ internal static class ToolLocator
     public static string Find(string name)
     {
         var bundled = Path.Combine(ToolsDirectory, name + ".exe");
-        return File.Exists(bundled) ? bundled : name;
+        if (File.Exists(bundled)) return bundled;
+
+        // adb suele no estar en el PATH: probar donde lo deja el Android SDK.
+        if (name == "adb")
+        {
+            var sdk = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Android", "Sdk", "platform-tools", "adb.exe");
+            if (File.Exists(sdk)) return sdk;
+        }
+
+        return name;
+    }
+
+    /// <summary>APK de la app de la tablet que deja el instalador, si existe.</summary>
+    public static string? BundledApk()
+    {
+        var apk = Path.Combine(ToolsDirectory, "NexScreen.apk");
+        return File.Exists(apk) ? apk : null;
     }
 
     /// <summary>True si el ejecutable existe y responde al argumento indicado.</summary>

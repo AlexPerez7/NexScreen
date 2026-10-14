@@ -12,6 +12,10 @@ internal sealed class StreamServer
 {
     private readonly HostOptions _options;
     private readonly IStreamObserver _observer;
+    private volatile Task? _activeSession;
+
+    /// <summary>True mientras hay una tablet conectada.</summary>
+    public bool HasActiveSession => _activeSession is { IsCompleted: false };
 
     public StreamServer(HostOptions options, IStreamObserver? observer = null)
     {
@@ -47,6 +51,7 @@ internal sealed class StreamServer
 
                 sessionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 sessionTask = RunSessionAsync(client, sessionCts.Token);
+                _activeSession = sessionTask;
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

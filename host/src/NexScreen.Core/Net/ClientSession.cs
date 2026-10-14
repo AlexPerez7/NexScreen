@@ -12,11 +12,12 @@ namespace NexScreen.Core.Net;
 internal sealed class ClientSession
 {
     private static readonly TimeSpan HelloTimeout = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan FirstFrameTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan FirstFrameTimeout = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan StatsInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan RestartDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan RestartWindow = TimeSpan.FromSeconds(30);
     private const int MaxRestartsPerWindow = 10;
+    private const int MaxStallRetries = 3;
     private static readonly TimeSpan ScreenCacheTtl = TimeSpan.FromSeconds(1);
     private const int MaxInputErrorsLogged = 5;
 
@@ -189,29 +190,49 @@ internal sealed class ClientSession
 
         var encoderIndex = 0;
         var hasStreamed = false;
+        var stallRetries = 0;
         var recentRestarts = new Queue<DateTime>();
         while (true)
         {
             var settings = new VideoSourceSettings(
                 resolveMonitor(), _options.Fps, _options.BitrateMbps, maxWidth, maxHeight, encoders[encoderIndex]);
 
-            long framesSent;
+            PumpResult result;
             string diagnostics, sourceName;
             await using (var source = FfmpegVideoSource.Start(_options.FfmpegPath, settings))
             {
                 sourceName = source.Name;
-                if (!hasStreamed)
+                if (!hasStreamed && stallRetries == 0)
                 {
                     Log.Info($"Encoder: {source.Name}, máx {maxWidth}x{maxHeight} @ {_options.Fps} fps, {_options.BitrateMbps} Mbps");
                 }
 
-                framesSent = await PumpAsync(source, channel, _observer, ct).ConfigureAwait(false);
+                result = await PumpAsync(source, channel, _observer, ct).ConfigureAwait(false);
                 ct.ThrowIfCancellationRequested();
                 diagnostics = source.Diagnostics;
             }
 
-            if (!hasStreamed && framesSent == 0)
+            // Con la sesión bloqueada (o UAC en pantalla) Windows no deja capturar: esperar el
+            // desbloqueo sin gastar reintentos ni culpar al encoder.
+            if (result.Frames == 0 && SessionLock.IsLocked())
             {
+                Log.Warn("La sesión de Windows está bloqueada; la transmisión sigue al desbloquear");
+                await SessionLock.WaitUntilUnlockedAsync(ct).ConfigureAwait(false);
+                Log.Info("Sesión desbloqueada, reanudando la captura");
+                continue;
+            }
+
+            if (!hasStreamed && result.Frames == 0)
+            {
+                // ffmpeg vivo pero sin cuadros: no es una falla del encoder, reintentar con el mismo.
+                if (result.Stalled && stallRetries < MaxStallRetries)
+                {
+                    stallRetries++;
+                    Log.Warn($"La captura no arrancó, reintentando ({stallRetries}/{MaxStallRetries})");
+                    await Task.Delay(RestartDelay, ct).ConfigureAwait(false);
+                    continue;
+                }
+
                 if (encoderIndex == encoders.Length - 1)
                 {
                     throw new IOException($"El encoder {sourceName} no produjo video. {diagnostics}");
@@ -219,6 +240,7 @@ internal sealed class ClientSession
 
                 Log.Warn($"{sourceName} no produjo video, probando el siguiente encoder. {diagnostics}");
                 encoderIndex++;
+                stallRetries = 0;
                 continue;
             }
 
@@ -253,8 +275,11 @@ internal sealed class ClientSession
     private static string FirstLine(string text) =>
         text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? "sin detalle";
 
-    /// <summary>Envía frames hasta que la fuente termina. Devuelve la cantidad enviada.</summary>
-    private static async Task<long> PumpAsync(
+    /// <summary>Cuadros enviados y si la fuente se colgó (seguía viva pero no entregó el primer cuadro).</summary>
+    private readonly record struct PumpResult(long Frames, bool Stalled);
+
+    /// <summary>Envía frames hasta que la fuente termina.</summary>
+    private static async Task<PumpResult> PumpAsync(
         IVideoSource source, MessageChannel channel, IStreamObserver observer, CancellationToken ct)
     {
         using var firstFrameTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -262,35 +287,39 @@ internal sealed class ClientSession
 
         long frames = 0, bytes = 0, intervalFrames = 0, intervalBytes = 0;
         var interval = Stopwatch.StartNew();
-        // Si vence el timeout la fuente mata ffmpeg y el enumerador termina sin frames.
-        await foreach (var frame in source.ReadFramesAsync(firstFrameTimeout.Token).ConfigureAwait(false))
+        try
         {
-            if (frames == 0) firstFrameTimeout.CancelAfter(Timeout.InfiniteTimeSpan);
-
-            await channel.WriteVideoAsync(frame, ct).ConfigureAwait(false);
-            frames++;
-            bytes += frame.Data.Length;
-            if ((frame.Flags & FrameFlags.Config) == 0) intervalFrames++;
-            intervalBytes += frame.Data.Length;
-
-            if (interval.Elapsed >= StatsInterval)
+            await foreach (var frame in source.ReadFramesAsync(firstFrameTimeout.Token).ConfigureAwait(false))
             {
-                var seconds = interval.Elapsed.TotalSeconds;
-                var fps = intervalFrames / seconds;
-                var mbps = intervalBytes * 8 / seconds / 1_000_000;
-                Log.Info($"Stream: {fps:F1} fps, {mbps:F1} Mbps");
-                observer.OnStats(fps, mbps);
-                intervalFrames = intervalBytes = 0;
-                interval.Restart();
+                if (frames == 0) firstFrameTimeout.CancelAfter(Timeout.InfiniteTimeSpan);
+
+                await channel.WriteVideoAsync(frame, ct).ConfigureAwait(false);
+                frames++;
+                bytes += frame.Data.Length;
+                if ((frame.Flags & FrameFlags.Config) == 0) intervalFrames++;
+                intervalBytes += frame.Data.Length;
+
+                if (interval.Elapsed >= StatsInterval)
+                {
+                    var seconds = interval.Elapsed.TotalSeconds;
+                    var fps = intervalFrames / seconds;
+                    var mbps = intervalBytes * 8 / seconds / 1_000_000;
+                    Log.Info($"Stream: {fps:F1} fps, {mbps:F1} Mbps");
+                    observer.OnStats(fps, mbps);
+                    intervalFrames = intervalBytes = 0;
+                    interval.Restart();
+                }
             }
         }
-
-        if (frames == 0 && firstFrameTimeout.IsCancellationRequested && !ct.IsCancellationRequested)
+        catch (OperationCanceledException) when (frames == 0 && !ct.IsCancellationRequested)
         {
-            Log.Warn($"{source.Name} no entregó el primer frame en {FirstFrameTimeout.TotalSeconds:F0} s");
+            // Venció el timeout del primer cuadro: la lectura del pipe se cancela (o ffmpeg muere).
         }
 
+        var stalled = frames == 0 && firstFrameTimeout.IsCancellationRequested && !ct.IsCancellationRequested;
+        if (stalled) Log.Warn($"{source.Name} no entregó el primer frame en {FirstFrameTimeout.TotalSeconds:F0} s");
+
         Log.Debug($"Fuente terminada: {frames} frames, {bytes / 1024} KiB");
-        return frames;
+        return new PumpResult(frames, stalled);
     }
 }

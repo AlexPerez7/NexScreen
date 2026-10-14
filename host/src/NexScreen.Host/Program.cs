@@ -4,6 +4,7 @@ using NexScreen.Core;
 using NexScreen.Core.Display;
 using NexScreen.Core.Net;
 using NexScreen.Core.Protocol;
+using NexScreen.Core.Usb;
 
 Console.OutputEncoding = Encoding.UTF8;
 // Coordenadas y resoluciones de pantalla en píxeles físicos, sin virtualización de DPI.
@@ -51,11 +52,29 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-await new StreamServer(options).RunAsync(cts.Token);
+var server = new StreamServer(options);
+var tasks = new List<Task> { server.RunAsync(cts.Token) };
+var adbPath = ToolLocator.Find("adb");
+if (options.UsbAutoConnect && ToolLocator.Runs(adbPath, "version"))
+{
+    var usb = new UsbAutoConnector(
+        new AdbClient(adbPath), options.Port, () => server.HasActiveSession, new LogUsbObserver(), ToolLocator.BundledApk());
+    tasks.Add(usb.RunAsync(cts.Token));
+}
+
+try
+{
+    await Task.WhenAll(tasks);
+}
+catch (OperationCanceledException) when (cts.IsCancellationRequested)
+{
+}
+
 return 0;
 
 static void PrintDisplays()
 {
+    Console.WriteLine($"Sesión de Windows bloqueada: {(SessionLock.IsLocked() ? "sí (no se puede capturar)" : "no")}");
     Console.WriteLine("Pantallas (GDI):");
     foreach (var display in DisplayDevices.List())
     {
@@ -73,4 +92,24 @@ static void PrintDisplays()
     Console.WriteLine("Salidas DXGI del adaptador 0 (índice para --monitor):");
     var outputs = DxgiOutputs.ListDefaultAdapterOutputs();
     for (var i = 0; i < outputs.Count; i++) Console.WriteLine($"  {i}: {outputs[i]}");
+}
+
+/// <summary>En la consola los avisos de USB ya quedan en el log.</summary>
+file sealed class LogUsbObserver : IUsbObserver
+{
+    public void OnTabletLaunched(string device)
+    {
+    }
+
+    public void OnTabletUnauthorized(string device)
+    {
+    }
+
+    public void OnAppMissing(string device)
+    {
+    }
+
+    public void OnUsbError(string message)
+    {
+    }
 }

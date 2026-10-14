@@ -2,6 +2,8 @@ package dev.nexscreen.client
 
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.SurfaceHolder
 import android.view.View
 import android.view.WindowManager
@@ -30,6 +32,8 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
     private var client: StreamClient? = null
     private var videoWidth = 0
     private var videoHeight = 0
+    private var reconnectAttempts = 0
+    private val handler = Handler(Looper.getMainLooper())
 
     private val host by lazy { intent.getStringExtra(EXTRA_HOST) ?: "127.0.0.1" }
     private val port by lazy { intent.getIntExtra(EXTRA_PORT, Protocol.DEFAULT_PORT) }
@@ -65,6 +69,13 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
+        reconnectAttempts = 0
+        startClient()
+    }
+
+    private fun startClient() {
+        val holder = binding.surface.holder
+        if (!holder.surface.isValid) return
         val client = StreamClient(host, port, holder.surface, displayInfo(), this).also { it.start() }
         this.client = client
         // Los toques sobre el video se reenvían al PC como táctil y lápiz de Windows.
@@ -76,6 +87,7 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
+        handler.removeCallbacksAndMessages(null)
         binding.surface.setOnTouchListener(null)
         binding.surface.setOnGenericMotionListener(null)
         client?.stop()
@@ -114,11 +126,13 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
     }
 
     override fun onConnecting() = runOnUiThread {
-        binding.status.text = getString(R.string.status_connecting, host, port)
+        // Mientras se reconecta queda el último cuadro de fondo y el aviso de reconexión.
+        if (reconnectAttempts == 0) binding.status.text = getString(R.string.status_connecting, host, port)
         binding.status.isVisible = true
     }
 
     override fun onConnected() = runOnUiThread {
+        reconnectAttempts = 0
         binding.status.text = getString(R.string.status_waiting_video)
     }
 
@@ -139,13 +153,33 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
         )
     }
 
+    /**
+     * La conexión se cortó sin que el usuario saliera: el host pudo reiniciarse (por ejemplo, al
+     * cambiar una opción en la bandeja) o la red tuvo un corte. Se reintenta un rato antes de rendirse.
+     */
     override fun onDisconnected(error: Throwable?) = runOnUiThread {
-        val reason = error?.message ?: error?.javaClass?.simpleName ?: "el PC cerró la conexión"
-        Toast.makeText(this, getString(R.string.disconnected, reason), Toast.LENGTH_LONG).show()
-        finish()
+        client = null
+        if (isFinishing || isDestroyed) return@runOnUiThread
+
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            val reason = error?.message ?: error?.javaClass?.simpleName ?: getString(R.string.reason_host_closed)
+            Toast.makeText(this, getString(R.string.disconnected, reason), Toast.LENGTH_LONG).show()
+            finish()
+            return@runOnUiThread
+        }
+
+        reconnectAttempts++
+        binding.status.text = getString(R.string.status_reconnecting)
+        binding.status.isVisible = true
+        handler.postDelayed(::startClient, RECONNECT_DELAY_MS)
     }
 
     companion object {
+        private const val RECONNECT_DELAY_MS = 1500L
+
+        /** ~30 s de reintentos. */
+        private const val MAX_RECONNECT_ATTEMPTS = 20
+
         const val EXTRA_HOST = "host"
         const val EXTRA_PORT = "port"
         const val EXTRA_SHOW_STATS = "show_stats"
