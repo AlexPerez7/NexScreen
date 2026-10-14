@@ -88,6 +88,25 @@ Filename: "powershell.exe"; \
 Type: filesandordirs; Name: "{app}\tools"
 
 [Code]
+// El servidor de adb que deja corriendo NexScreen (tools\adb.exe) no tiene ventana y el Restart
+// Manager no puede cerrarlo: al actualizar, ese archivo queda en uso y la instalación se anula.
+// Se detiene antes de copiar, junto con NexScreen, solo si corren desde la carpeta instalada
+// (no se toca el adb de Android Studio u otras herramientas).
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  AppDir: String;
+  ResultCode: Integer;
+begin
+  Result := '';
+  AppDir := ExpandConstant('{app}');
+  if FileExists(AppDir + '\tools\adb.exe') then
+    Exec(AppDir + '\tools\adb.exe', 'kill-server', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec('powershell.exe',
+    '-NoProfile -ExecutionPolicy Bypass -Command "Get-Process adb, NexScreen -ErrorAction SilentlyContinue | ' +
+    'Where-Object { $_.Path -like ''' + AppDir + '\*'' } | Stop-Process -Force"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
 function ShouldRelaunch: Boolean;
 begin
   Result := WizardSilent and (ExpandConstant('{param:RELAUNCH|0}') = '1');
