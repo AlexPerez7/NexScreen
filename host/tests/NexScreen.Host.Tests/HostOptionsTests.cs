@@ -12,6 +12,7 @@ public class HostOptionsTests
         Assert.Equal(27190, options.Port);
         Assert.Equal(60, options.Fps);
         Assert.Equal(EncoderKind.Auto, options.Encoder);
+        Assert.Null(options.Position);
     }
 
     [Fact]
@@ -28,7 +29,41 @@ public class HostOptionsTests
         Assert.True(options.Verbose);
     }
 
+    [Fact]
+    public void ParsesDisplayOptions()
+    {
+        var options = HostOptions.Parse(["--mode", "mirror", "--position", "LEFT", "--list-displays"]);
+
+        Assert.Equal(ScreenMode.Mirror, options.Mode);
+        Assert.Equal(Display.DisplayPosition.Left, options.Position);
+        Assert.True(options.ListDisplays);
+    }
+
     [Theory]
+    [InlineData(true, "Extend")]
+    [InlineData(false, "Mirror")]
+    public void AutoModeDependsOnVirtualDisplay(bool available, string expected)
+    {
+        var options = HostOptions.Parse([]);
+
+        options.ResolveMode(available);
+
+        Assert.Equal(Enum.Parse<ScreenMode>(expected), options.Mode);
+    }
+
+    [Fact]
+    public void ExplicitModeIsNotOverridden()
+    {
+        var options = HostOptions.Parse(["--mode", "mirror"]);
+
+        options.ResolveMode(virtualDisplayAvailable: true);
+
+        Assert.Equal(ScreenMode.Mirror, options.Mode);
+    }
+
+    [Theory]
+    [InlineData("--mode", "2")]
+    [InlineData("--position", "middle")]
     [InlineData("--port", "0")]
     [InlineData("--fps", "abc")]
     [InlineData("--encoder", "nvenc")]

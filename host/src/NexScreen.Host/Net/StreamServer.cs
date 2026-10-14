@@ -71,7 +71,8 @@ internal sealed class StreamServer
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
             }
-            catch (Exception ex) when (ex is IOException or SocketException or InvalidDataException)
+            catch (Exception ex) when (ex is IOException or SocketException or InvalidDataException
+                                           or InvalidOperationException or TimeoutException)
             {
                 Log.Warn($"Sesión con {endpoint} terminada: {ex.Message}");
             }

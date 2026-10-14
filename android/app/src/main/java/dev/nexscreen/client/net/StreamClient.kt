@@ -78,19 +78,20 @@ class StreamClient(
 
             var lastPing = 0L
             var lastStats = SystemClock.elapsedRealtime()
+            var videoWidth = 0
+            var videoHeight = 0
+            var decoderConfigured = false
             while (running) {
                 val message = channel.read()
                 when (message.type) {
                     Protocol.TYPE_CONFIG -> {
                         val config = JSONObject(String(message.payload, Charsets.UTF_8))
                         checkConfig(config)
+                        videoWidth = config.getInt("maxWidth")
+                        videoHeight = config.getInt("maxHeight")
                         decoder?.release()
-                        decoder = VideoDecoder(
-                            surface,
-                            config.getInt("maxWidth"),
-                            config.getInt("maxHeight"),
-                            decoderListener,
-                        ).also { it.start() }
+                        decoder = VideoDecoder(surface, videoWidth, videoHeight, decoderListener).also { it.start() }
+                        decoderConfigured = false
                         listener.onConnected()
                     }
                     Protocol.TYPE_VIDEO -> {
@@ -99,6 +100,17 @@ class StreamClient(
                         val prefix = ByteBuffer.wrap(payload, 0, Protocol.VIDEO_PREFIX_SIZE)
                         val ptsUs = prefix.long
                         val flags = prefix.get().toInt()
+                        if (flags and Protocol.FLAG_CONFIG != 0) {
+                            // SPS/PPS nuevos a mitad de sesión: el host reinició la captura.
+                            // Un decoder limpio evita artefactos si cambiaron los parámetros.
+                            if (decoderConfigured) {
+                                Log.i(TAG, "Nueva configuración de video, reiniciando el decoder")
+                                decoder?.release()
+                                decoder = VideoDecoder(surface, videoWidth, videoHeight, decoderListener)
+                                    .also { it.start() }
+                            }
+                            decoderConfigured = true
+                        }
                         decoder?.queue(
                             payload,
                             Protocol.VIDEO_PREFIX_SIZE,

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text.Json;
+using NexScreen.Host.Display;
 using NexScreen.Host.Protocol;
 using NexScreen.Host.Video;
 
@@ -12,6 +13,9 @@ internal sealed class ClientSession
     private static readonly TimeSpan HelloTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan FirstFrameTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan StatsInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan RestartDelay = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan RestartWindow = TimeSpan.FromSeconds(30);
+    private const int MaxRestartsPerWindow = 10;
 
     private readonly HostOptions _options;
 
@@ -31,9 +35,44 @@ internal sealed class ClientSession
             new ConfigMessage(Wire.Version, "h264", maxWidth, maxHeight, _options.Fps),
             ct).ConfigureAwait(false);
 
+        var extend = _options.Mode == ScreenMode.Extend;
+        Func<int> resolveMonitor = () => _options.Monitor;
+        if (extend)
+        {
+            // El monitor virtual toma la resolución nativa de la tablet: no hay escalado.
+            var gdiName = await VirtualDisplay.AttachAsync(maxWidth, maxHeight, _options.Fps, _options.Position, ct)
+                .ConfigureAwait(false);
+            // El índice DXGI puede cambiar si el usuario reordena las pantallas durante la sesión.
+            resolveMonitor = () => VirtualDisplay.OutputIndex(gdiName);
+        }
+
+        try
+        {
+            await StreamAsync(channel, resolveMonitor, maxWidth, maxHeight, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (extend) DetachVirtualDisplay();
+        }
+    }
+
+    private static void DetachVirtualDisplay()
+    {
+        try
+        {
+            VirtualDisplay.Detach(rememberPosition: true);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            Log.Warn($"No se pudo quitar el monitor virtual: {ex.Message}");
+        }
+    }
+
+    private async Task StreamAsync(MessageChannel channel, Func<int> resolveMonitor, int maxWidth, int maxHeight, CancellationToken ct)
+    {
         using var sessionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var receive = ReceiveLoopAsync(channel, sessionCts.Token);
-        var video = StreamVideoAsync(channel, maxWidth, maxHeight, sessionCts.Token);
+        var video = StreamVideoAsync(channel, resolveMonitor, maxWidth, maxHeight, sessionCts.Token);
 
         var finished = await Task.WhenAny(receive, video).ConfigureAwait(false);
         await sessionCts.CancelAsync().ConfigureAwait(false);
@@ -89,33 +128,68 @@ internal sealed class ClientSession
         Log.Info("El cliente cerró la conexión");
     }
 
-    private async Task StreamVideoAsync(MessageChannel channel, int maxWidth, int maxHeight, CancellationToken ct)
+    /// <summary>
+    /// Mantiene la captura viva. Si nunca produjo video prueba el siguiente encoder; si se cortó
+    /// después de transmitir (Windows invalida Desktop Duplication al reordenar pantallas, cambiar
+    /// la resolución, mostrar UAC o bloquear la sesión) la reinicia sin cortar la conexión.
+    /// </summary>
+    private async Task StreamVideoAsync(MessageChannel channel, Func<int> resolveMonitor, int maxWidth, int maxHeight, CancellationToken ct)
     {
         EncoderKind[] encoders = _options.Encoder == EncoderKind.Auto
             ? [EncoderKind.Qsv, EncoderKind.X264]
             : [_options.Encoder];
 
-        for (var i = 0; i < encoders.Length; i++)
+        var encoderIndex = 0;
+        var hasStreamed = false;
+        var recentRestarts = new Queue<DateTime>();
+        while (true)
         {
             var settings = new VideoSourceSettings(
-                _options.Monitor, _options.Fps, _options.BitrateMbps, maxWidth, maxHeight, encoders[i]);
-            var isLastOption = i == encoders.Length - 1;
+                resolveMonitor(), _options.Fps, _options.BitrateMbps, maxWidth, maxHeight, encoders[encoderIndex]);
 
-            await using var source = FfmpegVideoSource.Start(_options.FfmpegPath, settings);
-            Log.Info($"Encoder: {source.Name}, máx {maxWidth}x{maxHeight} @ {_options.Fps} fps, {_options.BitrateMbps} Mbps");
-
-            var framesSent = await PumpAsync(source, channel, ct).ConfigureAwait(false);
-            ct.ThrowIfCancellationRequested();
-
-            var diagnostics = source.Diagnostics;
-            if (framesSent > 0 || isLastOption)
+            long framesSent;
+            string diagnostics, sourceName;
+            await using (var source = FfmpegVideoSource.Start(_options.FfmpegPath, settings))
             {
-                throw new IOException($"El encoder {source.Name} se detuvo. {diagnostics}");
+                sourceName = source.Name;
+                if (!hasStreamed)
+                {
+                    Log.Info($"Encoder: {source.Name}, máx {maxWidth}x{maxHeight} @ {_options.Fps} fps, {_options.BitrateMbps} Mbps");
+                }
+
+                framesSent = await PumpAsync(source, channel, ct).ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+                diagnostics = source.Diagnostics;
             }
 
-            Log.Warn($"{source.Name} no produjo video, probando el siguiente encoder. {diagnostics}");
+            if (!hasStreamed && framesSent == 0)
+            {
+                if (encoderIndex == encoders.Length - 1)
+                {
+                    throw new IOException($"El encoder {sourceName} no produjo video. {diagnostics}");
+                }
+
+                Log.Warn($"{sourceName} no produjo video, probando el siguiente encoder. {diagnostics}");
+                encoderIndex++;
+                continue;
+            }
+
+            hasStreamed = true;
+            var now = DateTime.UtcNow;
+            while (recentRestarts.Count > 0 && now - recentRestarts.Peek() > RestartWindow) recentRestarts.Dequeue();
+            if (recentRestarts.Count >= MaxRestartsPerWindow)
+            {
+                throw new IOException($"La captura falló {MaxRestartsPerWindow} veces seguidas. {diagnostics}");
+            }
+
+            recentRestarts.Enqueue(now);
+            Log.Warn($"La captura se interrumpió ({FirstLine(diagnostics)}); reiniciando");
+            await Task.Delay(RestartDelay, ct).ConfigureAwait(false);
         }
     }
+
+    private static string FirstLine(string text) =>
+        text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? "sin detalle";
 
     /// <summary>Envía frames hasta que la fuente termina. Devuelve la cantidad enviada.</summary>
     private static async Task<long> PumpAsync(IVideoSource source, MessageChannel channel, CancellationToken ct)
