@@ -1,6 +1,6 @@
 # NexScreen
 
-Usá una tablet Android (desarrollado para Samsung Galaxy Tab S9 FE) como monitor de un PC
+Usa una tablet Android (desarrollado para Samsung Galaxy Tab S9 FE) como monitor de un PC
 con Windows, por **USB** o **WiFi**.
 
 ```
@@ -32,7 +32,7 @@ monitor virtual (Virtual Display Driver, 2304x1440)
   agrega un monitor virtual con su resolución nativa, lo captura sin escalar y lo quita al
   desconectarse, así no quedan ventanas perdidas en un monitor invisible. Se controla con la
   API CCD de Windows (`SetDisplayConfig`) y el named pipe del driver; no requiere admin.
-- La posición del monitor se recuerda: movelo en *Configuración → Pantalla* y la próxima vez
+- La posición del monitor se recuerda: muévelo en *Configuración → Pantalla* y la próxima vez
   aparece en el mismo lugar (`%APPDATA%\NexScreen\host-state.json`).
 - Si Windows invalida la captura (reordenar pantallas, cambiar resolución, UAC), el host la
   reinicia sin cortar la conexión.
@@ -72,7 +72,7 @@ dotnet run --project src/NexScreen.Host            # opciones: -- --help
 Opciones útiles: `--mode mirror`, `--position left` (forzar posición), `--monitor 1` (al espejar),
 `--fps 30`, `--bitrate 20`, `--encoder x264`, `--list-displays` (diagnóstico), `--verbose`.
 
-> **Escala:** 2304×1440 en 11" se ve chico al 100%. Elegí 150% para la pantalla de la tablet en
+> **Escala:** 2304×1440 en 11" se ve chico al 100%. Elige 150% para la pantalla de la tablet en
 > *Configuración → Pantalla*; Windows lo recuerda.
 
 > `nexscreen-host` debe correr en la sesión de escritorio del usuario: Desktop Duplication devuelve
@@ -91,9 +91,9 @@ O abrir la carpeta `android/` en Android Studio y presionar Run.
 ### 3. Conectar
 
 - **USB:** `scripts/usb-connect.ps1` y en la tablet *Conectar por USB*.
-- **WiFi:** una vez, como administrador, `scripts/allow-firewall.ps1`. En la tablet ingresá una
-  de las IPs que muestra `nexscreen-host` al iniciar y tocá *Conectar por WiFi*. Las redes corporativas
-  suelen aislar clientes WiFi entre sí; si no conecta, probá con USB o con el hotspot del PC.
+- **WiFi:** una vez, como administrador, `scripts/allow-firewall.ps1`. En la tablet ingresa una
+  de las IPs que muestra `nexscreen-host` al iniciar y toca *Conectar por WiFi*. Las redes corporativas
+  suelen aislar clientes WiFi entre sí; si no conecta, prueba con USB o con el hotspot del PC.
 
 ## Desarrollo
 

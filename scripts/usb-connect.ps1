@@ -16,7 +16,7 @@ if (-not $adb) {
     $adb = Join-Path $env:LOCALAPPDATA 'Android\Sdk\platform-tools\adb.exe'
 }
 if (-not (Test-Path $adb)) {
-    throw "No se encontró adb. Instalá Android platform-tools o agregalo al PATH."
+    throw "No se encontró adb. Instala Android platform-tools o agrégalo al PATH."
 }
 
 $devices = & $adb devices | Select-Object -Skip 1 | Where-Object { $_ -match '\tdevice$' }
@@ -27,4 +27,4 @@ if (-not $devices) {
 & $adb reverse "tcp:$Port" "tcp:$Port"
 if ($LASTEXITCODE -ne 0) { throw "adb reverse falló" }
 
-Write-Host "Listo: en la tablet tocá 'Conectar por USB' (127.0.0.1:$Port)." -ForegroundColor Green
+Write-Host "Listo: en la tablet toca 'Conectar por USB' (127.0.0.1:$Port)." -ForegroundColor Green

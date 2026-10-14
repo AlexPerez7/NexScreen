@@ -41,7 +41,7 @@ Log.Info($"NexScreen host {version?.ToString(3)} (protocolo v{Wire.Version})");
 
 if (!FfmpegAvailable(options.FfmpegPath))
 {
-    Log.Error($"No se encontró ffmpeg ('{options.FfmpegPath}'). Instalalo con: winget install Gyan.FFmpeg");
+    Log.Error($"No se encontró ffmpeg ('{options.FfmpegPath}'). Instálalo con: winget install Gyan.FFmpeg");
     return 1;
 }
 
@@ -50,7 +50,7 @@ if (options.Mode == ScreenMode.Extend)
 {
     if (VirtualDisplay.Find() is null)
     {
-        Log.Error("--mode extend requiere el monitor virtual: ejecutá scripts\\install-virtual-display.ps1 como administrador");
+        Log.Error("--mode extend requiere el monitor virtual: ejecuta scripts\\install-virtual-display.ps1 como administrador");
         return 1;
     }
 

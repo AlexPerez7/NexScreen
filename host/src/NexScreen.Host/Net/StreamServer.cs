@@ -88,7 +88,7 @@ internal sealed class StreamServer
     private void LogAddresses()
     {
         Log.Info($"Escuchando en el puerto {_options.Port}");
-        Log.Info($"  USB:  ejecutá scripts\\usb-connect.ps1 y elegí \"USB\" en la tablet");
+        Log.Info($"  USB:  ejecuta scripts\\usb-connect.ps1 y elige \"USB\" en la tablet");
 
         var addresses = NetworkInterface.GetAllNetworkInterfaces()
             .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback)
