@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Expone el puerto del host en la tablet por USB (adb reverse).
 .DESCRIPTION

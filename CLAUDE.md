@@ -174,6 +174,12 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 
 ## Releases (fase 4f)
 
+- **Antes de publicar, agregar la sección `## [X.Y.Z] - fecha` en `CHANGELOG.md`** con los cambios
+  para el usuario (Novedades / Mejoras / Correcciones / Importante). El texto del release sale de
+  ahí (`scripts/release-notes.ps1`, que se puede correr en local para revisarlo) y, si falta,
+  el workflow falla antes de compilar. Ir agregando los cambios a la sección mientras se trabaja.
+- Los `.ps1` del repo van en UTF-8 **con BOM**: sin BOM, PowerShell 5 (el del instalador y el del
+  PC) lee los acentos mal.
 - **Publicar:** `git tag vX.Y.Z` + `git push origin vX.Y.Z`. El workflow `.github/workflows/release.yml`
   corre los tests, firma el APK, arma el instalador con esa versión y crea el release con
   `NexScreen-Setup-X.Y.Z.exe` y `NexScreen-X.Y.Z.apk`. CI (`ci.yml`) compila y prueba cada push.

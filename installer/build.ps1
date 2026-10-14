@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Arma el instalador de NexScreen: dist\NexScreen-Setup-<versión>.exe
 .DESCRIPTION

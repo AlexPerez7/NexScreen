@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Instala (o desinstala con -Uninstall) el monitor virtual que NexScreen usa para extender el escritorio.
 .DESCRIPTION

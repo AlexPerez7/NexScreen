@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Abre en el Firewall de Windows los puertos que NexScreen usa por WiFi:
     TCP 27190 (video e input) y UDP 27191 (descubrimiento: la tablet encuentra el PC).

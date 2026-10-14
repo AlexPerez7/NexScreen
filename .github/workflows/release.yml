@@ -2,7 +2,8 @@
 #   git tag v0.5.0
 #   git push origin v0.5.0
 # Compila y prueba el host, firma el APK con la clave de NexScreen (secretos del repo), arma el
-# instalador y crea el release con NexScreen-Setup-X.Y.Z.exe y NexScreen-X.Y.Z.apk.
+# instalador y crea el release con NexScreen-Setup-X.Y.Z.exe y NexScreen-X.Y.Z.apk. El texto del
+# release sale de la sección de la versión en CHANGELOG.md (obligatoria).
 name: Release
 
 on:
@@ -34,6 +35,11 @@ jobs:
           $version = '${{ github.ref_name }}'.TrimStart('v')
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "El tag debe ser vX.Y.Z (recibido: ${{ github.ref_name }})" }
           "value=$version" >> $env:GITHUB_OUTPUT
+
+      # Antes de compilar: si falta la sección en CHANGELOG.md, el release falla enseguida.
+      - name: Notas del release
+        shell: pwsh
+        run: scripts\release-notes.ps1 -Version ${{ steps.version.outputs.value }} -OutFile "$env:RUNNER_TEMP\release-notes.md"
 
       - name: Tests del host
         run: dotnet test host -c Release
@@ -71,15 +77,5 @@ jobs:
         run: |
           $version = '${{ steps.version.outputs.value }}'
           Copy-Item android\app\build\outputs\apk\release\app-release.apk "dist\NexScreen-$version.apk"
-          $notes = @"
-          ## Instalación
-
-          1. Descarga **NexScreen-Setup-$version.exe** e instálalo en el PC.
-          2. En la tablet activa *Opciones de desarrollador → Depuración USB* y enchúfala: NexScreen le
-             instala la app y se conecta solo. También puedes instalar **NexScreen-$version.apk** a mano.
-
-          Por WiFi: abre la app en la tablet y toca tu PC en "PCs en la red" (red marcada como Privada).
-
-          "@
           gh release create '${{ github.ref_name }}' "dist\NexScreen-Setup-$version.exe" "dist\NexScreen-$version.apk" `
-            --title "NexScreen $version" --notes $notes --generate-notes
+            --title "NexScreen $version" --notes-file "$env:RUNNER_TEMP\release-notes.md" --generate-notes
