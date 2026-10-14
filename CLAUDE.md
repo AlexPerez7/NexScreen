@@ -166,8 +166,11 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
   quedó apuntando a otro exe (por ejemplo, el de desarrollo).
 - Instalado en `C:\Program Files\NexScreen`. Log del driver: `C:\ProgramData\NexScreen\install-virtual-display.log`.
   Desinstalar quita también las reglas del firewall y el monitor virtual.
-- **En el PC del usuario ya está instalada la versión 0.4.0**: para probar cambios del código hay
-  que cerrar el NexScreen instalado (usa el mismo puerto).
+- **En el PC del usuario hay un NexScreen instalado** (0.4.1, compilación local con el
+  actualizador; se actualiza solo desde la 0.5.0): para probar cambios del código hay que cerrar
+  el NexScreen instalado (usa el mismo puerto). Para armar un instalador local:
+  `installer\build.ps1 -Apk <APK firmado> -Version X.Y.Z` (en PowerShell, `'-PversionName=X.Y.Z'`
+  va entre comillas al llamar a gradlew).
 
 ## Releases (fase 4f)
 

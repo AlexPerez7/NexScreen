@@ -3,7 +3,7 @@
   <!-- Configuración común a todos los proyectos del host. La versión de NexScreen se define acá
        y la usan el instalador y los releases (el workflow la sobrescribe con el tag vX.Y.Z). -->
   <PropertyGroup>
-    <Version>0.4.0</Version>
+    <Version>0.5.0</Version>
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
