@@ -1,0 +1,81 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using NexScreen.Core;
+using NexScreen.Core.Display;
+using NexScreen.Core.Protocol;
+
+namespace NexScreen.Tray;
+
+internal enum Quality
+{
+    High,
+    Normal,
+    Saver,
+}
+
+/// <summary>Preferencias del usuario, en %APPDATA%\NexScreen\settings.json.</summary>
+internal sealed class AppSettings
+{
+    private static readonly string DefaultPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NexScreen", "settings.json");
+
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        Converters = { new JsonStringEnumConverter() },
+    };
+
+    public ScreenMode Mode { get; set; } = ScreenMode.Auto;
+
+    /// <summary>Null: recordar la última posición en la que el usuario dejó la tablet.</summary>
+    public DisplayPosition? Position { get; set; }
+
+    public Quality Quality { get; set; } = Quality.Normal;
+
+    public int Port { get; set; } = Wire.DefaultPort;
+
+    public static int BitrateMbps(Quality quality) => quality switch
+    {
+        Quality.High => 20,
+        Quality.Saver => 6,
+        _ => 12,
+    };
+
+    public HostOptions ToHostOptions() => new()
+    {
+        Mode = Mode,
+        Position = Position,
+        BitrateMbps = BitrateMbps(Quality),
+        Port = Port,
+    };
+
+    public static AppSettings Load(string? path = null)
+    {
+        path ??= DefaultPath;
+        try
+        {
+            return File.Exists(path)
+                ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(path), Json) ?? new AppSettings()
+                : new AppSettings();
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            Log.Warn($"No se pudo leer {path}, se usan los valores por defecto: {ex.Message}");
+            return new AppSettings();
+        }
+    }
+
+    public void Save(string? path = null)
+    {
+        path ??= DefaultPath;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, JsonSerializer.Serialize(this, Json));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Warn($"No se pudo guardar {path}: {ex.Message}");
+        }
+    }
+}

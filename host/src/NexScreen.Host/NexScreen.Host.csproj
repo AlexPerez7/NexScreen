@@ -1,22 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Consola de desarrollo y diagnóstico (opciones list-displays y verbose). Para el uso diario
+       está la app de bandeja, NexScreen.Tray. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>nexscreen-host</AssemblyName>
     <RootNamespace>NexScreen.Host</RootNamespace>
-    <InvariantGlobalization>true</InvariantGlobalization>
-    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="NexScreen.Host.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
+    <ProjectReference Include="..\NexScreen.Core\NexScreen.Core.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- App de uso diario: ícono en la bandeja del sistema que mantiene el servidor corriendo. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>NexScreen</AssemblyName>
+    <RootNamespace>NexScreen.Tray</RootNamespace>
+    <ApplicationIcon>Assets\nexscreen.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationVisualStyles>true</ApplicationVisualStyles>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\nexscreen.ico" LogicalName="nexscreen.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NexScreen.Core\NexScreen.Core.csproj" />
+  </ItemGroup>
+
+</Project>

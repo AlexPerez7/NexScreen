@@ -20,19 +20,28 @@ NexScreen convierte una tablet Android (desarrollado con una Samsung Galaxy Tab 
 | 1 | Espejo de un monitor → tablet | ✅ |
 | 2 | Monitor virtual para extender el escritorio | ✅ |
 | 3 | Táctil y S Pen (presión) hacia Windows | ✅ |
-| 4 | App de bandeja, autoconexión, perfiles, instalador | Pendiente |
+| 4 | App de bandeja, autoconexión, instalador, releases | En curso (4a bandeja ✅) |
+
+Plan de la fase 4: 4a app de bandeja · 4b autoconexión USB · 4c descubrimiento WiFi ·
+4d escala automática · 4e instalador (Inno Setup) · 4f releases con GitHub Actions + APK firmado.
 
 ## Estructura
 
 ```
-host/src/NexScreen.Host/      Servidor Windows (C# / .NET 8, net8.0-windows) -> nexscreen-host.exe
+host/Directory.Build.props    Versión de NexScreen (única fuente) y configuración común
+host/src/NexScreen.Core/      Lógica del host (librería, net8.0-windows)
   Protocol/                   Framing y mensajes (Wire.cs)
   Video/                      ffmpeg (ddagrab + h264_qsv/x264) -> FLV -> Annex-B
-  Net/                        StreamServer (acepta conexiones), ClientSession (una sesión)
+  Net/                        StreamServer, ClientSession, IStreamObserver (eventos para la UI)
   Display/                    Monitor virtual: API CCD, GDI, DXGI, driver VDD
   Input/                      Táctil y lápiz: mensaje POINTER, traductor de frames, inyección Win32
-host/tests/NexScreen.Host.Tests/  xUnit
+  HostStartup.cs              Preparación común (ffmpeg, modo, limpieza del monitor virtual)
+  ToolLocator.cs              ffmpeg/adb en tools\ junto al exe (instalador) o en el PATH
+host/src/NexScreen.Tray/      App de bandeja (WinForms) -> NexScreen.exe. Uso diario.
+host/src/NexScreen.Host/      Consola de desarrollo y diagnóstico -> nexscreen-host.exe
+host/tests/NexScreen.Core.Tests/  xUnit
 host/tools/fake_client.py     Cliente que simula la tablet (prueba sin hardware)
+host/tools/make-icon.ps1      Regenera Assets/nexscreen.ico
 android/app/                  App Kotlin (paquete dev.nexscreen.client)
 scripts/                      install-virtual-display.ps1, usb-connect.ps1, allow-firewall.ps1
 docs/protocol.md              Especificación del protocolo
@@ -43,8 +52,13 @@ docs/protocol.md              Especificación del protocolo
 En este PC `dotnet` y `adb` pueden no estar en el PATH: usar rutas completas.
 
 ```powershell
-# Host: compilar y probar
+# Host: compilar todo y probar (dotnet test solo compila los tests y Core, no la bandeja)
+& "C:\Program Files\dotnet\dotnet.exe" build host
 & "C:\Program Files\dotnet\dotnet.exe" test host
+
+# App de bandeja (log en %LOCALAPPDATA%\NexScreen\logs\nexscreen.log,
+# preferencias en %APPDATA%\NexScreen\settings.json)
+Start-Process host\src\NexScreen.Tray\bin\Debug\net8.0-windows\NexScreen.exe
 
 # App: compilar (el JDK es la JBR de Android Studio, Java 25)
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
@@ -78,8 +92,12 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 - **Desktop Duplication devuelve "access denied"** desde las tareas en segundo plano de Claude Code
   (`run_in_background`), servicios o con la sesión bloqueada. El host siempre se lanza con
   `Start-Process` en la sesión del usuario.
-- **El host en ejecución bloquea `nexscreen-host.exe`**: detenerlo antes de recompilar
-  (`Get-Process nexscreen-host | Stop-Process -Force` y cerrar la ventana `nexscreen-host`).
+- **El host en ejecución bloquea sus ejecutables**: detenerlo antes de recompilar
+  (`Get-Process nexscreen-host, NexScreen | Stop-Process -Force` y cerrar la ventana `nexscreen-host`).
+  Solo puede correr uno a la vez (los dos usan el puerto 27190).
+- **Scripts de Python que reescriben archivos**: `Path.write_text` en Windows convierte `\n` en
+  CRLF y después Edit no encuentra los textos. Escribir bytes o usar `newline="\n"`.
+- `InternalsVisibleTo` usa el nombre del **ensamblado** (`nexscreen-host`, `NexScreen`), no el del proyecto.
 - **Los daemons de Gradle y Kotlin bloquean la carpeta del proyecto**: para moverla o renombrarla,
   `gradlew --stop` y matar los `java.exe` que queden.
 - **Reiniciar el servidor adb** (`adb kill-server`) hace que la tablet vuelva a pedir autorización

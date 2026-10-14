@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Lógica del host: protocolo, captura/codificación, monitor virtual, input y servidor.
+       La usan la app de bandeja (NexScreen.Tray) y la consola de desarrollo (NexScreen.Host). -->
+  <PropertyGroup>
+    <RootNamespace>NexScreen.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Nombres de ensamblado (AssemblyName), no de proyecto. -->
+    <InternalsVisibleTo Include="nexscreen-host" />
+    <InternalsVisibleTo Include="NexScreen" />
+    <InternalsVisibleTo Include="NexScreen.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
+  </ItemGroup>
+
+</Project>
