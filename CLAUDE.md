@@ -20,7 +20,7 @@ NexScreen convierte una tablet Android (desarrollado con una Samsung Galaxy Tab 
 | 1 | Espejo de un monitor → tablet | ✅ |
 | 2 | Monitor virtual para extender el escritorio | ✅ |
 | 3 | Táctil y S Pen (presión) hacia Windows | ✅ |
-| 4 | App de bandeja, autoconexión, instalador, releases | En curso (4a bandeja ✅, 4b USB ✅, 4c WiFi ✅) |
+| 4 | App de bandeja, autoconexión, instalador, releases | En curso (4a ✅, 4b USB ✅, 4c WiFi ✅, 4d escala ✅) |
 
 Plan de la fase 4: 4a app de bandeja · 4b autoconexión USB · 4c descubrimiento WiFi ·
 4d escala automática · 4e instalador (Inno Setup) · 4f releases con GitHub Actions + APK firmado.
@@ -131,6 +131,9 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 - `ChangeDisplaySettingsEx` **no puede agregar** una pantalla al escritorio (devuelve -1): para
   agregar o quitar se usa `SetDisplayConfig`; CDS solo fija el modo y la posición después.
 - El driver no acepta 0 monitores: "apagar" es quitarlo del escritorio.
+- **Escala (DPI) por monitor:** no hay API pública. Se usa la interna de Configuración →
+  Pantalla: `DisplayConfigGet/SetDeviceInfo` con tipos -3/-4 (`DisplayConfig.cs`). Los valores
+  son relativos a la escala recomendada por Windows (`DpiScale.cs`). Se aplica antes de capturar.
 - Al reordenar pantallas, Windows invalida Desktop Duplication (`887a0026`); `ClientSession`
   reinicia la captura sin cortar la conexión.
 - La posición elegida por el usuario se guarda en `%APPDATA%\NexScreen\host-state.json`

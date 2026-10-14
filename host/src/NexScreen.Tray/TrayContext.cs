@@ -50,6 +50,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         menu.Items.Add(ModeMenu());
         menu.Items.Add(PositionMenu());
         menu.Items.Add(QualityMenu());
+        menu.Items.Add(ScaleMenu());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Abrir NexScreen en la tablet (USB)", null, async (_, _) => await ConnectUsbNowAsync()));
         menu.Items.Add(_startWithWindows);
@@ -93,6 +94,18 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         ],
         () => _settings.Quality,
         quality => _settings.Quality = quality);
+
+    private ToolStripMenuItem ScaleMenu() => RadioMenu<int?>("Escala de la tablet",
+        [
+            ("100 % (texto más chico, más espacio)", 100),
+            ("125 %", 125),
+            ("150 % (recomendada)", 150),
+            ("175 %", 175),
+            ("200 % (texto más grande)", 200),
+            ("No cambiarla (la elijo en Configuración de Windows)", null),
+        ],
+        () => _settings.TabletScale,
+        scale => _settings.TabletScale = scale);
 
     /// <summary>Submenú de opciones excluyentes. Cambiar la opción guarda y reinicia el servidor.</summary>
     private ToolStripMenuItem RadioMenu<T>(string title, (string Text, T Value)[] options, Func<T> current, Action<T> apply)

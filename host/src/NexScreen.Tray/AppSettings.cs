@@ -32,6 +32,12 @@ internal sealed class AppSettings
 
     public Quality Quality { get; set; } = Quality.Normal;
 
+    /// <summary>
+    /// Escala de Windows para la tablet. 150 % deja el texto de un tamaño parecido al del notebook
+    /// en una tablet de 11" a 2304×1440. Null: no tocarla (la elige el usuario en Configuración).
+    /// </summary>
+    public int? TabletScale { get; set; } = 150;
+
     public int Port { get; set; } = Wire.DefaultPort;
 
     public static int BitrateMbps(Quality quality) => quality switch
@@ -46,6 +52,7 @@ internal sealed class AppSettings
         Mode = Mode,
         Position = Position,
         BitrateMbps = BitrateMbps(Quality),
+        ScalePercent = TabletScale,
         Port = Port,
     };
 

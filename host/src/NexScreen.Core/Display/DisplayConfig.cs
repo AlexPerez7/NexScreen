@@ -21,6 +21,10 @@ internal static class DisplayConfig
     private const uint ModeIdxInvalid = 0xFFFFFFFF;
     private const int DeviceInfoGetSourceName = 1;
     private const int DeviceInfoGetTargetName = 2;
+
+    // Tipos internos (no documentados) que usa Configuración → Pantalla para la escala.
+    private const int DeviceInfoGetDpiScale = -3;
+    private const int DeviceInfoSetDpiScale = -4;
     private const int ErrorInsufficientBuffer = 122;
 
     /// <summary>
@@ -68,6 +72,64 @@ internal static class DisplayConfig
         Set(others, modes, "agregar");
         return SourceName(path) ?? throw new InvalidOperationException("Monitor virtual sin nombre GDI");
     }
+
+    /// <summary>Escala actual del monitor virtual en porcentaje, o null si no está en el escritorio.</summary>
+    public static int? GetVirtualScale()
+    {
+        if (ActiveVirtualPath() is not { } path) return null;
+        var request = DpiRequest(path);
+        return DisplayConfigGetDeviceInfo(ref request) == 0
+            ? DpiScale.ToPercent(request.MinScaleRelative, request.CurrentScaleRelative)
+            : null;
+    }
+
+    /// <summary>
+    /// Fija la escala del monitor virtual (lo mismo que elegirla en Configuración → Pantalla).
+    /// Usa la API interna que usa la propia Configuración. Devuelve la escala que quedó.
+    /// </summary>
+    public static int SetVirtualScale(int percent)
+    {
+        var path = ActiveVirtualPath() ?? throw new InvalidOperationException("El monitor virtual no está en el escritorio");
+        var current = DpiRequest(path);
+        if (DisplayConfigGetDeviceInfo(ref current) != 0) throw new InvalidOperationException("No se pudo leer la escala del monitor virtual");
+
+        var target = DpiScale.ToRelative(current.MinScaleRelative, current.MaxScaleRelative, percent);
+        if (target != current.CurrentScaleRelative)
+        {
+            var set = new DpiScaleSet
+            {
+                Header = new DeviceInfoHeader
+                {
+                    Type = DeviceInfoSetDpiScale,
+                    Size = (uint)Marshal.SizeOf<DpiScaleSet>(),
+                    AdapterId = path.SourceInfo.AdapterId,
+                    Id = path.SourceInfo.Id,
+                },
+                ScaleRelative = target,
+            };
+            var error = DisplayConfigSetDeviceInfo(ref set);
+            if (error != 0) throw new InvalidOperationException($"No se pudo cambiar la escala (error {error})");
+        }
+
+        return DpiScale.ToPercent(current.MinScaleRelative, target);
+    }
+
+    private static PathInfo? ActiveVirtualPath()
+    {
+        var (paths, _) = Query(QdcOnlyActivePaths);
+        return paths.Where(IsVirtualTarget).Cast<PathInfo?>().FirstOrDefault();
+    }
+
+    private static DpiScaleGet DpiRequest(PathInfo path) => new()
+    {
+        Header = new DeviceInfoHeader
+        {
+            Type = DeviceInfoGetDpiScale,
+            Size = (uint)Marshal.SizeOf<DpiScaleGet>(),
+            AdapterId = path.SourceInfo.AdapterId,
+            Id = path.SourceInfo.Id,
+        },
+    };
 
     /// <summary>Nombre GDI con el que el monitor virtual está en el escritorio, o null si no está.</summary>
     public static string? VirtualSourceName()
@@ -295,6 +357,28 @@ internal static class DisplayConfig
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
         public string MonitorDevicePath;
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DpiScaleGet
+    {
+        public DeviceInfoHeader Header;
+        public int MinScaleRelative;
+        public int CurrentScaleRelative;
+        public int MaxScaleRelative;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DpiScaleSet
+    {
+        public DeviceInfoHeader Header;
+        public int ScaleRelative;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern int DisplayConfigGetDeviceInfo(ref DpiScaleGet request);
+
+    [DllImport("user32.dll")]
+    private static extern int DisplayConfigSetDeviceInfo(ref DpiScaleSet request);
 
     [DllImport("user32.dll")]
     private static extern int DisplayConfigGetDeviceInfo(ref SourceDeviceName request);

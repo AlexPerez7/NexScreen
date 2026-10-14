@@ -33,6 +33,8 @@ internal sealed class HostOptions
           --bitrate <n>     Bitrate en Mbps (por defecto 12)
           --encoder <e>     auto | qsv | x264 (por defecto auto: Quick Sync con fallback a x264)
           --ffmpeg <ruta>   Ruta a ffmpeg.exe (por defecto se busca en PATH)
+          --scale <n>       Escala de Windows para la tablet al extender: 100, 125, 150, 175, 200...
+                            (por defecto no se cambia)
           --no-usb          No detectar tablets por USB (por defecto arma el túnel y abre la app sola)
           --list-displays   Lista pantallas y salidas DXGI, y termina
           --verbose         Log detallado
@@ -51,6 +53,9 @@ internal sealed class HostOptions
     public bool Verbose { get; set; }
     public bool ShowHelp { get; set; }
     public bool ListDisplays { get; set; }
+
+    /// <summary>Escala de Windows para el monitor de la tablet (100, 125, 150...). Null: no tocarla.</summary>
+    public int? ScalePercent { get; set; }
 
     /// <summary>Detectar tablets por USB, armar el túnel y abrir la app (requiere adb).</summary>
     public bool UsbAutoConnect { get; set; } = true;
@@ -89,6 +94,9 @@ internal sealed class HostOptions
                     break;
                 case "--list-displays":
                     options.ListDisplays = true;
+                    break;
+                case "--scale":
+                    options.ScalePercent = ParseInt(arg, NextValue(args, ref i), 100, 500);
                     break;
                 case "--no-usb":
                     options.UsbAutoConnect = false;

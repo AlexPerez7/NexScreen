@@ -87,6 +87,8 @@ static void PrintDisplays()
         {
             var modes = DisplayDevices.Modes(display.DeviceName).Select(m => $"{m.Width}x{m.Height}@{m.RefreshRate}");
             Console.WriteLine($"      modos: {string.Join(", ", modes)}");
+            var scale = DisplayConfig.GetVirtualScale();
+            Console.WriteLine($"      escala: {(scale is null ? "(no está en el escritorio)" : $"{scale} %")}");
         }
     }
 

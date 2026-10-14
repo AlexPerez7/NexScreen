@@ -56,6 +56,8 @@ internal sealed class ClientSession
                 .ConfigureAwait(false);
             // El índice DXGI puede cambiar si el usuario reordena las pantallas durante la sesión.
             resolveMonitor = () => VirtualDisplay.OutputIndex(gdiName);
+            // Antes de empezar a capturar: cambiar la escala reconfigura la pantalla.
+            if (_options.ScalePercent is { } scale) ApplyScale(scale);
         }
 
         try
@@ -65,6 +67,20 @@ internal sealed class ClientSession
         finally
         {
             if (extend) DetachVirtualDisplay();
+        }
+    }
+
+    private static void ApplyScale(int percent)
+    {
+        try
+        {
+            var applied = DisplayConfig.SetVirtualScale(percent);
+            Log.Info($"Escala de la tablet: {applied} %");
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Sin escala la tablet funciona igual (texto más chico): no cortar la sesión.
+            Log.Warn($"No se pudo ajustar la escala de la tablet: {ex.Message}");
         }
     }
 
