@@ -4,7 +4,7 @@
 
 # NexScreen
 
-**Convierte tu tablet Android en un monitor extendido de Windows, por USB o WiFi, con táctil y lápiz.**
+**Convierte tu tablet o celular Android en un monitor extendido de Windows, por USB o WiFi, con táctil y lápiz.**
 
 [![Release](https://img.shields.io/github/v/release/AlexPerez7/NexScreen?label=versi%C3%B3n&color=4C9AFF)](https://github.com/AlexPerez7/NexScreen/releases/latest)
 [![CI](https://github.com/AlexPerez7/NexScreen/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexPerez7/NexScreen/actions/workflows/ci.yml)
@@ -21,7 +21,7 @@
 
 ---
 
-NexScreen hace que Windows vea tu tablet como **una pantalla más**: puedes arrastrar ventanas hacia
+NexScreen hace que Windows vea tu tablet (o tu celular) como **una pantalla más**: puedes arrastrar ventanas hacia
 ella, usarla con los dedos o con el lápiz, y desconectarla sin que queden ventanas perdidas. No
 hace falta cuenta, servidor ni configuración: enchufas la tablet y funciona.
 
@@ -29,11 +29,11 @@ hace falta cuenta, servidor ni configuración: enchufas la tablet y funciona.
 
 | | |
 |---|---|
-| 🖥️ **Monitor real** | Un monitor virtual con la resolución nativa de la tablet. Lo ubicas a la izquierda, derecha, arriba o abajo, como cualquier pantalla. También puede espejar un monitor existente. |
+| 🖥️ **Monitor real** | Un monitor virtual con la resolución y la frecuencia nativas del dispositivo (60, 90 o 120 Hz), sin la zona de la cámara en los celulares, y la escala de Windows elegida según su pantalla. Lo ubicas a la izquierda, derecha, arriba o abajo, como cualquier pantalla. También puede espejar un monitor existente. |
 | ✍️ **Táctil y lápiz** | Tocar es clic, dos dedos desplazan y hacen zoom. El S Pen llega a Windows como un lápiz de verdad: presión, inclinación, botón lateral y rechazo de palma. |
 | 🔌 **USB sin configurar** | Al enchufar la tablet, NexScreen instala la app, la abre y se conecta. También la actualiza cuando hay una versión nueva. |
 | 📶 **WiFi seguro** | La tablet encuentra el PC en la red. Todo el tráfico va cifrado (TLS) y cada tablet se empareja una vez con un código de 6 dígitos. |
-| ⚡ **Baja latencia** | Captura con Desktop Duplication y H.264 por hardware (Intel Quick Sync), decodificación por hardware en la tablet. ~60 fps a 2304×1440. |
+| ⚡ **Baja latencia** | Captura con Desktop Duplication y H.264 por hardware con la GPU que tengas (Intel Quick Sync, NVIDIA NVENC, AMD AMF o Media Foundation), decodificación por hardware en el dispositivo. Hasta 120 fps si la pantalla lo admite. |
 | 📉 **Se adapta a la red** | Si el WiFi se congestiona, baja la calidad en vez de acumular atraso y la recupera sola. Si la imagen se daña, la tablet pide una completa y se recupera en menos de un segundo. |
 | 🔄 **Se mantiene solo** | Ícono en la bandeja, inicio con Windows y actualizaciones automáticas desde GitHub. |
 
@@ -42,8 +42,8 @@ hace falta cuenta, servidor ni configuración: enchufas la tablet y funciona.
 | | Mínimo | Probado con |
 |---|---|---|
 | **PC** | Windows 10 u 11 de 64 bits | Notebook con Intel Core i7-13620H (gráficos Intel UHD) |
-| **Tablet** | Android 8.0 o superior | Samsung Galaxy Tab S9 FE (2304×1440, Android 16) |
-| **Video** | Cualquier PC: Intel Quick Sync si está disponible, si no Media Foundation | |
+| **Tablet o celular** | Android 8.0 o superior | Samsung Galaxy Tab S9 FE (2304×1440, 90 Hz, Android 16) |
+| **Video** | Cualquier PC: usa el encoder de la GPU de la pantalla (Intel, NVIDIA o AMD) y, si no hay, Media Foundation por CPU (hasta 60 fps) | |
 | **WiFi** (opcional) | PC y tablet en la misma red, marcada como **Privada** en Windows | |
 
 ## Instalación
@@ -104,7 +104,9 @@ desbloquear.
 <details>
 <summary><b>El texto se ve muy chico en la tablet</b></summary>
 
-Sube la **Escala** desde el menú de la bandeja (por ejemplo, 150 %).
+Por defecto la escala es **Automática**: se elige según la densidad de la pantalla (150 % en una
+tablet de 11", 250-300 % en un celular). Si prefieres otro tamaño, cámbiala desde **Escala** en el
+menú de la bandeja.
 </details>
 
 ## Cómo funciona
@@ -113,11 +115,11 @@ Sube la **Escala** desde el menú de la bandeja (por ejemplo, 150 %).
 flowchart LR
     subgraph PC["PC con Windows"]
         VDD["Monitor virtual<br/>(Virtual Display Driver)"] --> CAP["Desktop Duplication<br/>(ddagrab)"]
-        CAP --> ENC["H.264 por hardware<br/>(Quick Sync / Media Foundation)"]
+        CAP --> ENC["H.264 por hardware<br/>(Quick Sync / NVENC / AMF / Media Foundation)"]
         ENC --> HOST["NexScreen<br/>bandeja"]
         INJ["InjectSyntheticPointerInput<br/>(táctil y lápiz)"]
     end
-    subgraph TAB["Tablet Android"]
+    subgraph TAB["Tablet o celular Android"]
         DEC["MediaCodec<br/>(baja latencia)"] --> VIEW["Pantalla"]
         PEN["Dedos y S Pen"]
     end

@@ -17,7 +17,8 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.SSLSocket
 
-data class DisplayInfo(val width: Int, val height: Int, val dpi: Int)
+/** Pantalla del dispositivo: área útil en píxeles, densidad de Android y frecuencia máxima en Hz. */
+data class DisplayInfo(val width: Int, val height: Int, val dpi: Int, val refreshRate: Int)
 
 data class StreamStats(val fps: Float, val mbps: Float, val rttMs: Float?)
 
@@ -331,6 +332,7 @@ class StreamClient(
         .put("width", display.width)
         .put("height", display.height)
         .put("dpi", display.dpi)
+        .put("refreshRate", display.refreshRate)
         .toString()
         .toByteArray(Charsets.UTF_8)
 

@@ -44,6 +44,25 @@ public class PlacementTests
     }
 
     [Fact]
+    public void KeepsTheRememberedSideForALargerDevice()
+    {
+        // La tablet (2304 de ancho) quedó a la izquierda; un celular de 3120 no entra en ese lugar.
+        var state = new HostState { VirtualDisplayX = -2304, VirtualDisplayY = 0 };
+
+        Assert.Equal((-3120, 0), VirtualDisplay.ChoosePosition([Laptop], 3120, 1440, null, state));
+    }
+
+    [Theory]
+    [InlineData(-2304, 0, "Left")]
+    [InlineData(1920, 0, "Right")]
+    [InlineData(0, -1440, "Above")]
+    [InlineData(0, 1200, "Below")]
+    public void InfersSideOfRememberedPosition(int x, int y, string expected)
+    {
+        Assert.Equal(Enum.Parse<DisplayPosition>(expected), VirtualDisplay.SideOf([Laptop], x, y));
+    }
+
+    [Fact]
     public void StateRoundTripsThroughDisk()
     {
         var path = Path.Combine(Path.GetTempPath(), $"host-state-{Guid.NewGuid():N}.json");

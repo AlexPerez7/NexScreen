@@ -12,8 +12,12 @@ Guía para trabajar en NexScreen con Claude Code.
 
 ## Qué es
 
-NexScreen convierte una tablet Android (desarrollado con una Samsung Galaxy Tab S9 FE,
-2304×1440, Android 16) en un monitor extendido de un PC con Windows, por USB o WiFi.
+NexScreen convierte una tablet o un celular Android en un monitor extendido de un PC con Windows,
+por USB o WiFi. Se desarrolló con una Samsung Galaxy Tab S9 FE (2304×1440, 90 Hz, Android 16) y un
+notebook sin GPU dedicada, pero **no debe depender de ellos**: nada de resoluciones, fps, escalas o
+encoders fijos para ese hardware (ver "Ajustes según el dispositivo y la GPU"). En el código y los
+docs "tablet" suele querer decir "el dispositivo Android"; en los textos para el usuario, usar
+"dispositivo".
 
 | Fase | Contenido | Estado |
 |------|-----------|--------|
@@ -23,6 +27,7 @@ NexScreen convierte una tablet Android (desarrollado con una Samsung Galaxy Tab 
 | 4 | App de bandeja, autoconexión, instalador, releases | ✅ |
 | 5 | Actualización automática, TLS y emparejamiento por WiFi (protocolo v2) | ✅ |
 | 6 | Pedido de keyframe y bitrate adaptativo | ✅ |
+| 7 | Cualquier GPU (NVENC, AMF, varias GPU), celulares, fps/bitrate/escala según el dispositivo | ✅ (sin probar en NVIDIA/AMD ni celular) |
 
 Ideas para próximas versiones, priorizadas y con notas técnicas: `PLAN.md`.
 
@@ -32,7 +37,7 @@ Ideas para próximas versiones, priorizadas y con notas técnicas: `PLAN.md`.
 host/Directory.Build.props    Versión de NexScreen (única fuente) y configuración común
 host/src/NexScreen.Core/      Lógica del host (librería, net8.0-windows)
   Protocol/                   Framing y mensajes (Wire.cs)
-  Video/                      ffmpeg (ddagrab + h264_qsv/x264) -> FLV -> Annex-B
+  Video/                      ffmpeg (ddagrab + qsv/nvenc/amf/mf/x264) -> FLV -> Annex-B; StreamTuning (fps, bitrate, escala)
   Net/                        StreamServer, ClientSession, VideoStreamer, IStreamObserver (eventos para la UI)
   Display/                    Monitor virtual: API CCD, GDI, DXGI, driver VDD
   Input/                      Táctil y lápiz: mensaje POINTER, traductor de frames, inyección Win32
@@ -118,7 +123,10 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
   `gradlew --stop` y matar los `java.exe` que queden.
 - **Reiniciar el servidor adb** (`adb kill-server`) hace que la tablet vuelva a pedir autorización
   de depuración USB: avisarle al usuario.
-- El PC no tiene GPU dedicada: Intel UHD (i7-13620H). Quick Sync funciona; x264 es el respaldo.
+- El PC no tiene GPU dedicada: Intel UHD (i7-13620H). Quick Sync funciona. NVENC y AMF **no se
+  pueden probar aquí**: en este PC fallan al instante y la cadena sigue con el siguiente encoder.
+- `scale_d3d11` del ffmpeg 9 incluido falla en este Intel ("Could not create the texture"): por
+  eso NVENC/AMF escalan por CPU cuando hace falta, en vez de en la GPU.
 - No hay feed NuGet global: el repo trae `host/nuget.config`.
 - Hay un hook de seguridad que bloquea comandos de PowerShell que contienen ciertos patrones
   (p. ej. `.Replace(` sobre rutas con espacios). Para editar archivos usar Edit/Write.
@@ -247,6 +255,28 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
   monitor virtual ni le avisa a la tablet por USB.
 - En la tablet, `StreamClient` guarda los SPS/PPS: si el decoder falla lo recrea, pide un
   keyframe y descarta cuadros hasta recibirlo (más de 3 fallas en 10 s cortan la conexión).
+
+## Ajustes según el dispositivo y la GPU
+
+- **Captura en la GPU correcta:** `DxgiOutputs` recorre todos los adaptadores (no solo el 0). Cada
+  pantalla es un `CaptureTarget` (adaptador, salida, fabricante); ffmpeg recibe
+  `-init_hw_device d3d11va=nexscreen:<adaptador> -filter_hw_device nexscreen` y ddagrab va en
+  `-filter_complex` (así recibe ese dispositivo: el log en verbose dice "Using provided hw_device_ctx").
+  `--monitor n` es el índice global de `--list-displays`.
+- **Encoder automático** (`FfmpegVideoSource.AutoEncoders`): el del fabricante de esa GPU
+  (Quick Sync / NVENC / AMF), luego `h264_mf` por GPU (`-hw_encoding 1`, cualquier fabricante),
+  luego por CPU y x264. NVENC, AMF y MF por GPU reciben la textura de ddagrab directa si la
+  pantalla entra en el dispositivo (siempre en modo extendido); si no, escalan por CPU.
+- **fps:** la frecuencia que informa la app en HELLO (`refreshRate`, entre 30 y 120; 60 si falta).
+  El monitor virtual se crea a esa frecuencia. Con encoders por CPU la captura se limita a 60 fps.
+- **Bitrate:** la "Calidad" de la bandeja y el valor por defecto de la consola (12) son la
+  referencia para 2304×1440@60; `StreamTuning.ScaleBitrate` la ajusta por píxeles y √(fps/60).
+  `--bitrate` en la consola es exacto (no se escala).
+- **Escala automática:** `dpi × 150 / 280` (densityDpi de Android), al paso más cercano. En
+  `settings.json`, `"tabletScale": 0` es "Automática" (nuevo valor por defecto); `null` no la toca.
+- **App:** manda el tamaño sin la zona de la cámara (insets de `displayCutout`), deja ese borde en
+  negro con padding, y pide el modo de pantalla de mayor frecuencia (`preferredDisplayModeId`).
+- Probar perfiles sin hardware: `fake_client.py --width 3120 --height 1440 --dpi 600 --refresh-rate 120`.
 
 ## Protocolo
 

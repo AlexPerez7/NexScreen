@@ -2,6 +2,7 @@ using System.Diagnostics;
 using NexScreen.Core.Display;
 using NexScreen.Core.Input;
 using NexScreen.Core.Protocol;
+using NexScreen.Core.Video;
 
 namespace NexScreen.Core.Net;
 
@@ -24,34 +25,41 @@ internal sealed class ClientSession
     /// <summary>Corre la sesión sobre un canal que ya pasó el <see cref="Handshake"/>.</summary>
     public async Task RunAsync(MessageChannel channel, HelloMessage hello, CancellationToken ct)
     {
-        Log.Info($"Cliente: {hello.Device} {hello.Width}x{hello.Height} @ {hello.Dpi} dpi");
+        var refresh = hello.RefreshRate > 0 ? $" @ {hello.RefreshRate} Hz" : "";
+        Log.Info($"Cliente: {hello.Device} {hello.Width}x{hello.Height}{refresh}, {hello.Dpi} dpi");
 
-        // La tablet se usa apaisada: el lado largo es el ancho.
-        var maxWidth = Math.Max(hello.Width, hello.Height);
-        var maxHeight = Math.Min(hello.Width, hello.Height);
+        // El dispositivo se usa apaisado: el lado largo es el ancho. H.264 necesita lados pares.
+        var maxWidth = Math.Max(hello.Width, hello.Height) & ~1;
+        var maxHeight = Math.Min(hello.Width, hello.Height) & ~1;
+        var fps = StreamTuning.ChooseFps(_options.Fps, hello.RefreshRate);
+        var bitrate = _options.ScaleBitrate
+            ? StreamTuning.ScaleBitrate(_options.BitrateMbps, maxWidth, maxHeight, fps)
+            : _options.BitrateMbps;
         await channel.WriteJsonAsync(
             MessageType.Config,
-            new ConfigMessage(Wire.Version, "h264", maxWidth, maxHeight, _options.Fps),
+            new ConfigMessage(Wire.Version, "h264", maxWidth, maxHeight, fps),
             ct).ConfigureAwait(false);
 
         _observer.OnClientConnected(hello.Device, maxWidth, maxHeight);
 
         var extend = _options.Mode == ScreenMode.Extend;
-        Func<int> resolveMonitor = () => _options.Monitor;
+        Func<CaptureTarget> resolveTarget = () => DxgiOutputs.ByIndex(_options.Monitor);
         if (extend)
         {
-            // El monitor virtual toma la resolución nativa de la tablet: no hay escalado.
-            var gdiName = await VirtualDisplay.AttachAsync(maxWidth, maxHeight, _options.Fps, _options.Position, ct)
+            // El monitor virtual toma la resolución y la frecuencia nativas del dispositivo: no hay escalado.
+            var gdiName = await VirtualDisplay.AttachAsync(maxWidth, maxHeight, fps, _options.Position, ct)
                 .ConfigureAwait(false);
             // El índice DXGI puede cambiar si el usuario reordena las pantallas durante la sesión.
-            resolveMonitor = () => VirtualDisplay.OutputIndex(gdiName);
+            resolveTarget = () => VirtualDisplay.CaptureTarget(gdiName);
             // Antes de empezar a capturar: cambiar la escala reconfigura la pantalla.
-            if (_options.ScalePercent is { } scale) ApplyScale(scale);
+            var scale = _options.AutoScale ? StreamTuning.AutoScalePercent(hello.Dpi) : _options.ScalePercent;
+            if (scale is { } percent) ApplyScale(percent);
         }
 
         try
         {
-            await StreamAsync(channel, resolveMonitor, maxWidth, maxHeight, ct).ConfigureAwait(false);
+            await StreamAsync(channel, resolveTarget, new StreamFormat(maxWidth, maxHeight, fps, bitrate), ct)
+                .ConfigureAwait(false);
         }
         finally
         {
@@ -64,12 +72,15 @@ internal sealed class ClientSession
         try
         {
             var applied = DisplayConfig.SetVirtualScale(percent);
-            Log.Info($"Escala de la tablet: {applied} %");
+            // Windows limita la escala según la resolución (por ejemplo, 225 % en 3120×1440).
+            Log.Info(applied == percent
+                ? $"Escala del dispositivo: {applied} %"
+                : $"Escala del dispositivo: {applied} % (se pidió {percent} %; es lo más cercano que permite Windows)");
         }
         catch (InvalidOperationException ex)
         {
-            // Sin escala la tablet funciona igual (texto más chico): no cortar la sesión.
-            Log.Warn($"No se pudo ajustar la escala de la tablet: {ex.Message}");
+            // Sin escala el dispositivo funciona igual (texto más chico): no cortar la sesión.
+            Log.Warn($"No se pudo ajustar la escala del dispositivo: {ex.Message}");
         }
     }
 
@@ -85,11 +96,11 @@ internal sealed class ClientSession
         }
     }
 
-    private async Task StreamAsync(MessageChannel channel, Func<int> resolveMonitor, int maxWidth, int maxHeight, CancellationToken ct)
+    private async Task StreamAsync(MessageChannel channel, Func<CaptureTarget> resolveTarget, StreamFormat format, CancellationToken ct)
     {
         using var sessionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        using var injector = new PointerInjector(CachedScreen(resolveMonitor));
-        var streamer = new VideoStreamer(_options, _observer, channel, resolveMonitor, maxWidth, maxHeight);
+        using var injector = new PointerInjector(CachedScreen(resolveTarget));
+        var streamer = new VideoStreamer(_options, _observer, channel, resolveTarget, format);
         var receive = ReceiveLoopAsync(channel, injector, streamer, sessionCts.Token);
         var video = streamer.RunAsync(sessionCts.Token);
 
@@ -111,7 +122,7 @@ internal sealed class ClientSession
     /// Rectángulo del monitor capturado para mapear el input. Se cachea un momento porque llegan
     /// cientos de eventos por segundo, y se refresca por si el usuario mueve el monitor.
     /// </summary>
-    private static Func<ScreenRect> CachedScreen(Func<int> resolveMonitor)
+    private static Func<ScreenRect> CachedScreen(Func<CaptureTarget> resolveTarget)
     {
         ScreenRect? cached = null;
         var age = Stopwatch.StartNew();
@@ -119,7 +130,7 @@ internal sealed class ClientSession
         {
             if (cached is null || age.Elapsed > ScreenCacheTtl)
             {
-                cached = DxgiOutputs.Bounds(resolveMonitor());
+                cached = DxgiOutputs.Bounds(resolveTarget());
                 age.Restart();
             }
 

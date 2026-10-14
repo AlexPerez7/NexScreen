@@ -3,7 +3,7 @@ using NexScreen.Core.Security;
 namespace NexScreen.Tray;
 
 /// <summary>
-/// Ventana con el PIN para emparejar una tablet por WiFi. Cerrarla o tocar "Cancelar" anula el
+/// Ventana con el PIN para emparejar un dispositivo por WiFi. Cerrarla o tocar "Cancelar" anula el
 /// emparejamiento; cuando termina (bien o mal) la cierra la bandeja con <see cref="CloseQuietly"/>.
 /// </summary>
 internal sealed class PairingForm : Form
@@ -15,7 +15,7 @@ internal sealed class PairingForm : Form
     {
         _cancel = cancel;
 
-        Text = "NexScreen: emparejar tablet";
+        Text = "NexScreen: emparejar dispositivo";
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -38,7 +38,7 @@ internal sealed class PairingForm : Form
 
         layout.Controls.Add(new Label
         {
-            Text = $"{device} quiere usar este PC como monitor por WiFi.\nPara permitirlo, ingresa este código en la tablet:",
+            Text = $"{device} quiere usar este PC como monitor por WiFi.\nPara permitirlo, ingresa este código en el dispositivo:",
             AutoSize = true,
             MaximumSize = new Size(380, 0),
             Margin = new Padding(0, 0, 0, 12),

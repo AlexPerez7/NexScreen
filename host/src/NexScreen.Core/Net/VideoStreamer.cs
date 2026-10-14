@@ -5,6 +5,9 @@ using NexScreen.Core.Video;
 
 namespace NexScreen.Core.Net;
 
+/// <summary>Lo que se transmite a este dispositivo: tamaño máximo, fps y bitrate máximo.</summary>
+internal readonly record struct StreamFormat(int MaxWidth, int MaxHeight, int Fps, int MaxBitrateMbps);
+
 /// <summary>
 /// El video de una sesión: mantiene viva la captura, adapta el bitrate a la red y atiende los
 /// pedidos de keyframe de la tablet.
@@ -31,27 +34,25 @@ internal sealed class VideoStreamer
     private readonly HostOptions _options;
     private readonly IStreamObserver _observer;
     private readonly MessageChannel _channel;
-    private readonly Func<int> _resolveMonitor;
-    private readonly int _maxWidth;
-    private readonly int _maxHeight;
+    private readonly Func<CaptureTarget> _resolveTarget;
+    private readonly StreamFormat _format;
     private readonly BitrateController? _bitrate;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private int _keyframeRequested;
     private TimeSpan? _lastSwitch;
 
     public VideoStreamer(
-        HostOptions options, IStreamObserver observer, MessageChannel channel, Func<int> resolveMonitor, int maxWidth, int maxHeight)
+        HostOptions options, IStreamObserver observer, MessageChannel channel, Func<CaptureTarget> resolveTarget, StreamFormat format)
     {
         _options = options;
         _observer = observer;
         _channel = channel;
-        _resolveMonitor = resolveMonitor;
-        _maxWidth = maxWidth;
-        _maxHeight = maxHeight;
-        _bitrate = options.AdaptiveBitrate ? new BitrateController(options.BitrateMbps) : null;
+        _resolveTarget = resolveTarget;
+        _format = format;
+        _bitrate = options.AdaptiveBitrate ? new BitrateController(format.MaxBitrateMbps) : null;
     }
 
-    private int CurrentBitrate => _bitrate?.CurrentMbps ?? _options.BitrateMbps;
+    private int CurrentBitrate => _bitrate?.CurrentMbps ?? _format.MaxBitrateMbps;
 
     /// <summary>La tablet no puede seguir decodificando: mandarle un keyframe. Se puede llamar desde cualquier hilo.</summary>
     public void RequestKeyframe() => Interlocked.Exchange(ref _keyframeRequested, 1);
@@ -64,7 +65,7 @@ internal sealed class VideoStreamer
     public async Task RunAsync(CancellationToken ct)
     {
         EncoderKind[] encoders = _options.Encoder == EncoderKind.Auto
-            ? [EncoderKind.Qsv, EncoderKind.Mf, EncoderKind.X264]
+            ? FfmpegVideoSource.AutoEncoders(_resolveTarget().Vendor)
             : [_options.Encoder];
 
         var encoderIndex = 0;
@@ -79,7 +80,8 @@ internal sealed class VideoStreamer
             if (!hasStreamed && stallRetries == 0)
             {
                 var mode = _bitrate is null ? "fijo" : "máximo, se adapta a la red";
-                Log.Info($"Encoder: {source.Source.Name}, máx {_maxWidth}x{_maxHeight} @ {_options.Fps} fps, " +
+                var fps = FfmpegVideoSource.EffectiveFps(source.Settings.Encoder, _format.Fps);
+                Log.Info($"Encoder: {source.Source.Name}, máx {_format.MaxWidth}x{_format.MaxHeight} @ {fps} fps, " +
                          $"{CurrentBitrate} Mbps ({mode})");
             }
 
@@ -134,8 +136,12 @@ internal sealed class VideoStreamer
         }
     }
 
-    private VideoSourceSettings Settings(EncoderKind encoder, int bitrateMbps) =>
-        new(_resolveMonitor(), _options.Fps, bitrateMbps, _maxWidth, _maxHeight, encoder);
+    private VideoSourceSettings Settings(EncoderKind encoder, int bitrateMbps)
+    {
+        var target = _resolveTarget();
+        var bounds = DxgiOutputs.Bounds(target);
+        return new(target, _format.Fps, bitrateMbps, _format.MaxWidth, _format.MaxHeight, encoder, bounds.Width, bounds.Height);
+    }
 
     private RunningSource StartSource(VideoSourceSettings settings, CancellationToken ct) =>
         new(FfmpegVideoSource.Start(_options.FfmpegPath, settings), settings, ct);
@@ -267,7 +273,7 @@ internal sealed class VideoStreamer
                     var fps = statsFrames / seconds;
                     var mbps = statsBytes * 8 / seconds / 1_000_000;
                     Log.Info($"Stream: {fps:F1} fps, {mbps:F1} Mbps (bitrate {CurrentBitrate} Mbps)");
-                    _observer.OnStats(new StreamStats(fps, mbps, CurrentBitrate, _options.BitrateMbps));
+                    _observer.OnStats(new StreamStats(fps, mbps, CurrentBitrate, _format.MaxBitrateMbps));
                     statsFrames = statsBytes = 0;
                     stats.Restart();
                 }
@@ -307,7 +313,7 @@ internal sealed class VideoStreamer
         if (_lastSwitch is { } last && _clock.Elapsed - last < MinKeyframeInterval) return false;
 
         Interlocked.Exchange(ref _keyframeRequested, 0);
-        Log.Info("La tablet pidió un keyframe");
+        Log.Info("El dispositivo pidió un keyframe");
         return true;
     }
 

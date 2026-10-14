@@ -53,10 +53,12 @@ internal enum MessageType : byte
 }
 
 /// <summary>
-/// Cliente → host, primer mensaje de la sesión. <see cref="Paired"/>: la tablet ya confía en el
-/// certificado TLS de este host (por WiFi; por USB se ignora).
+/// Cliente → host, primer mensaje de la sesión. <see cref="Paired"/>: el dispositivo ya confía en el
+/// certificado TLS de este host (por WiFi; por USB se ignora). <see cref="RefreshRate"/>: frecuencia
+/// máxima de su pantalla en Hz (0 si no la informa: apps anteriores a la 0.6.0).
 /// </summary>
-internal sealed record HelloMessage(int Protocol, string Device, int Width, int Height, int Dpi, bool Paired = false);
+internal sealed record HelloMessage(
+    int Protocol, string Device, int Width, int Height, int Dpi, bool Paired = false, int RefreshRate = 0);
 
 /// <summary>Host → cliente, respuesta al Hello. El tamaño real del video lo informa el decoder.</summary>
 internal sealed record ConfigMessage(int Protocol, string Codec, int MaxWidth, int MaxHeight, int Fps);

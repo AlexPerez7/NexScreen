@@ -32,11 +32,15 @@ internal sealed class AppSettings
 
     public Quality Quality { get; set; } = Quality.Normal;
 
+    /// <summary>Valor de <see cref="TabletScale"/> para elegir la escala según la pantalla del dispositivo.</summary>
+    public const int AutoScale = 0;
+
     /// <summary>
-    /// Escala de Windows para la tablet. 150 % deja el texto de un tamaño parecido al del notebook
-    /// en una tablet de 11" a 2304×1440. Null: no tocarla (la elige el usuario en Configuración).
+    /// Escala de Windows para el dispositivo: <see cref="AutoScale"/> la calcula con la densidad de
+    /// su pantalla (150 % en una tablet de 11", más en un celular). Null: no tocarla (la elige el
+    /// usuario en Configuración). El nombre quedó de cuando solo había tablets; se mantiene por el JSON.
     /// </summary>
-    public int? TabletScale { get; set; } = 150;
+    public int? TabletScale { get; set; } = AutoScale;
 
     public int Port { get; set; } = Wire.DefaultPort;
 
@@ -53,6 +57,7 @@ internal sealed class AppSettings
     /// <summary>Última versión nueva que se avisó con un globo (para no repetir el aviso cada día).</summary>
     public string? NotifiedUpdate { get; set; }
 
+    /// <summary>Bitrate máximo para 2304×1440 a 60 fps; el host lo ajusta a la pantalla del dispositivo.</summary>
     public static int BitrateMbps(Quality quality) => quality switch
     {
         Quality.High => 20,
@@ -65,7 +70,8 @@ internal sealed class AppSettings
         Mode = Mode,
         Position = Position,
         BitrateMbps = BitrateMbps(Quality),
-        ScalePercent = TabletScale,
+        ScalePercent = TabletScale == AutoScale ? null : TabletScale,
+        AutoScale = TabletScale == AutoScale,
         Port = Port,
     };
 

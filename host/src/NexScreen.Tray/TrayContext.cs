@@ -86,7 +86,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         menu.Items.Add(QualityMenu());
         menu.Items.Add(ScaleMenu());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("Abrir NexScreen en la tablet (USB)", null, async (_, _) => await ConnectUsbNowAsync()));
+        menu.Items.Add(new ToolStripMenuItem("Abrir NexScreen en el dispositivo (USB)", null, async (_, _) => await ConnectUsbNowAsync()));
         menu.Items.Add(PairedDevicesMenu());
         menu.Items.Add(_startWithWindows);
         menu.Items.Add(new ToolStripMenuItem("Abrir el registro", null, (_, _) => OpenLog()));
@@ -115,7 +115,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         () => _settings.Mode == ScreenMode.Mirror ? ScreenMode.Mirror : ScreenMode.Extend,
         mode => _settings.Mode = mode);
 
-    private ToolStripMenuItem PositionMenu() => RadioMenu<DisplayPosition?>("Posición de la tablet",
+    private ToolStripMenuItem PositionMenu() => RadioMenu<DisplayPosition?>("Posición del dispositivo",
         [
             ("Donde la dejé la última vez", null),
             ("A la izquierda", DisplayPosition.Left),
@@ -128,18 +128,19 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
 
     private ToolStripMenuItem QualityMenu() => RadioMenu("Calidad",
         [
-            ($"Alta ({AppSettings.BitrateMbps(Quality.High)} Mbps)", Quality.High),
-            ($"Normal ({AppSettings.BitrateMbps(Quality.Normal)} Mbps)", Quality.Normal),
-            ($"Ahorro ({AppSettings.BitrateMbps(Quality.Saver)} Mbps, para WiFi lento)", Quality.Saver),
+            ("Alta", Quality.High),
+            ("Normal", Quality.Normal),
+            ("Ahorro (para WiFi lento)", Quality.Saver),
         ],
         () => _settings.Quality,
         quality => _settings.Quality = quality);
 
-    private ToolStripMenuItem ScaleMenu() => RadioMenu<int?>("Escala de la tablet",
+    private ToolStripMenuItem ScaleMenu() => RadioMenu<int?>("Escala del dispositivo",
         [
+            ("Automática (según su pantalla, recomendada)", AppSettings.AutoScale),
             ("100 % (texto más chico, más espacio)", 100),
             ("125 %", 125),
-            ("150 % (recomendada)", 150),
+            ("150 %", 150),
             ("175 %", 175),
             ("200 % (texto más grande)", 200),
             ("No cambiarla (la elijo en Configuración de Windows)", null),
@@ -174,29 +175,29 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         return menu;
     }
 
-    /// <summary>Tablets emparejadas por WiFi; elegir una la olvida (tendrá que volver a ingresar el PIN).</summary>
+    /// <summary>Dispositivos emparejados por WiFi; elegir una la olvida (tendrá que volver a ingresar el PIN).</summary>
     private ToolStripMenuItem PairedDevicesMenu()
     {
-        var menu = new ToolStripMenuItem("Tablets emparejadas (WiFi)");
-        menu.DropDownItems.Add(new ToolStripMenuItem("Ninguna") { Enabled = false });
+        var menu = new ToolStripMenuItem("Dispositivos emparejados (WiFi)");
+        menu.DropDownItems.Add(new ToolStripMenuItem("Ninguno") { Enabled = false });
         menu.DropDownOpening += (_, _) =>
         {
             menu.DropDownItems.Clear();
             var devices = _paired.All;
             if (devices.Count == 0)
             {
-                menu.DropDownItems.Add(new ToolStripMenuItem("Ninguna") { Enabled = false });
+                menu.DropDownItems.Add(new ToolStripMenuItem("Ninguno") { Enabled = false });
                 return;
             }
 
             foreach (var device in devices.OrderBy(d => d.Name))
             {
-                var item = new ToolStripMenuItem($"Olvidar {device.Name} (emparejada el {device.PairedAt:dd-MM-yyyy})");
+                var item = new ToolStripMenuItem($"Olvidar {device.Name} (emparejado el {device.PairedAt:dd-MM-yyyy})");
                 item.Click += (_, _) =>
                 {
                     _paired.Remove(device.Fingerprint);
-                    Log.Info($"Se olvidó la tablet {device.Name}");
-                    ShowBalloon(5_000, "Tablet olvidada",
+                    Log.Info($"Se olvidó el dispositivo {device.Name}");
+                    ShowBalloon(5_000, "Dispositivo olvidado",
                         $"{device.Name} tendrá que volver a ingresar el código para conectarse por WiFi.", ToolTipIcon.Info);
                 };
                 menu.DropDownItems.Add(item);
@@ -235,7 +236,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
 
         var cts = new CancellationTokenSource();
         _serverCts = cts;
-        SetState(TrayState.Waiting, "Esperando la tablet");
+        SetState(TrayState.Waiting, "Esperando un dispositivo");
 
         var server = new StreamServer(options, this, _paired);
         var discovery = new DiscoveryResponder(options.Port, AppVersion);
@@ -503,7 +504,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
     private void ShowStatusBalloon()
     {
         var text = _device is null
-            ? "Conecta la tablet por USB o WiFi y abre la app NexScreen."
+            ? "Conecta una tablet o un celular Android por USB o WiFi y abre la app NexScreen."
             : _status.Text ?? "";
         ShowBalloon(5_000, "NexScreen", text, ToolTipIcon.Info);
     }
@@ -511,14 +512,14 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
     void IStreamObserver.OnClientConnected(string device, int width, int height) => _ui.Post(_ =>
     {
         _device = device;
-        SetState(TrayState.Connected, $"Conectada: {device} ({width}×{height})");
-        ShowBalloon(3_000, "Tablet conectada", device, ToolTipIcon.None);
+        SetState(TrayState.Connected, $"Conectado: {device} ({width}×{height})");
+        ShowBalloon(3_000, "Dispositivo conectado", device, ToolTipIcon.None);
     }, null);
 
     void IStreamObserver.OnStats(StreamStats stats) => _ui.Post(_ =>
     {
         if (_device is null) return;
-        var text = $"Conectada: {_device} · {stats.Fps:F0} fps · {stats.Mbps:F1} Mbps";
+        var text = $"Conectado: {_device} · {stats.Fps:F0} fps · {stats.Mbps:F1} Mbps";
         if (stats.BitrateMbps < stats.MaxBitrateMbps) text += $" (red lenta: máx {stats.BitrateMbps} Mbps)";
         SetState(TrayState.Connected, text);
     }, null);
@@ -528,10 +529,10 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         if (_exiting) return;
         var device = _device;
         _device = null;
-        SetState(TrayState.Waiting, "Esperando la tablet");
+        SetState(TrayState.Waiting, "Esperando un dispositivo");
         if (reason is not null && device is not null)
         {
-            ShowBalloon(5_000, "Tablet desconectada", reason, ToolTipIcon.Warning);
+            ShowBalloon(5_000, "Dispositivo desconectado", reason, ToolTipIcon.Warning);
         }
     }, null);
 
@@ -549,7 +550,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         _pairingForm = null;
         if (paired)
         {
-            ShowBalloon(5_000, "Tablet emparejada", $"{device} ya puede conectarse por WiFi sin código.", ToolTipIcon.Info);
+            ShowBalloon(5_000, "Dispositivo emparejado", $"{device} ya puede conectarse por WiFi sin código.", ToolTipIcon.Info);
         }
     }, null);
 
@@ -564,7 +565,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
             ToolTipIcon.Warning), null);
 
     void IUsbObserver.OnAppMissing(string device) => _ui.Post(_ =>
-        ShowBalloon(10_000, "Falta la app en la tablet",
+        ShowBalloon(10_000, "Falta la app en el dispositivo",
             $"Instala la app NexScreen en {device} para usarla como monitor.", ToolTipIcon.Warning), null);
 
     void IUsbObserver.OnUsbError(string message) => _ui.Post(_ =>

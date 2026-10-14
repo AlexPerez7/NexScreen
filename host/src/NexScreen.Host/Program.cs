@@ -96,9 +96,13 @@ static void PrintDisplays()
     Console.WriteLine("Caminos CCD (fuente -> monitor):");
     foreach (var path in DisplayConfig.DescribePaths()) Console.WriteLine($"  {path}");
 
-    Console.WriteLine("Salidas DXGI del adaptador 0 (índice para --monitor):");
-    var outputs = DxgiOutputs.ListDefaultAdapterOutputs();
-    for (var i = 0; i < outputs.Count; i++) Console.WriteLine($"  {i}: {outputs[i]}");
+    Console.WriteLine("Salidas DXGI (índice para --monitor):");
+    var outputs = DxgiOutputs.List();
+    for (var i = 0; i < outputs.Count; i++)
+    {
+        var o = outputs[i];
+        Console.WriteLine($"  {i}: {o.DeviceName}  adaptador {o.Target.Adapter} ({o.AdapterName}, {o.Target.Vendor}), salida {o.Target.Output}");
+    }
 }
 
 /// <summary>En la consola los avisos de USB ya quedan en el log.</summary>

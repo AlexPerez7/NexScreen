@@ -7,7 +7,18 @@ namespace NexScreen.Core;
 internal enum EncoderKind
 {
     Auto,
+
+    /// <summary>Intel Quick Sync.</summary>
     Qsv,
+
+    /// <summary>NVIDIA.</summary>
+    Nvenc,
+
+    /// <summary>AMD.</summary>
+    Amf,
+
+    /// <summary>Media Foundation con el encoder de hardware que instaló el driver de la GPU (cualquier fabricante).</summary>
+    MfGpu,
 
     /// <summary>Media Foundation por software: viene con Windows, está siempre disponible.</summary>
     Mf,
@@ -34,16 +45,18 @@ internal sealed class HostOptions
           --position <p>    right | left | above | below: dónde ubicar la tablet al extender
                             (por defecto: donde la dejaste la última vez en Configuración; right la primera vez)
           --monitor <n>     Al espejar: índice del monitor a capturar, orden DXGI (por defecto 0)
-          --fps <n>         Cuadros por segundo (por defecto 60)
-          --bitrate <n>     Bitrate máximo en Mbps (por defecto 12). Si la red no da abasto, se
-                            baja solo y vuelve a subir cuando la red se recupera
+          --fps <n>         Cuadros por segundo (por defecto, la frecuencia de la pantalla del
+                            dispositivo: 60, 90, 120...; hasta 60 con un encoder por CPU)
+          --bitrate <n>     Bitrate máximo en Mbps (por defecto 12 para 2304x1440 a 60 fps y
+                            proporcional a la resolución y los fps del dispositivo). Si la red no
+                            da abasto, se baja solo y vuelve a subir cuando la red se recupera
           --fixed-bitrate   No adaptar el bitrate a la red
-          --encoder <e>     auto | qsv | mf | x264 (por defecto auto: Quick Sync, si no Media
-                            Foundation, si no x264)
+          --encoder <e>     auto | qsv | nvenc | amf | mfgpu | mf | x264 (por defecto auto: el de
+                            la GPU de la pantalla, si no Media Foundation por GPU, si no por CPU)
           --ffmpeg <ruta>   Ruta a ffmpeg.exe (por defecto se busca en PATH)
-          --scale <n>       Escala de Windows para la tablet al extender: 100, 125, 150, 175, 200...
-                            (por defecto no se cambia)
-          --no-usb          No detectar tablets por USB (por defecto arma el túnel y abre la app sola)
+          --scale <n>       Escala de Windows para el dispositivo al extender: auto (según la
+                            densidad de su pantalla) o 100, 125, 150, 175, 200... (por defecto no se cambia)
+          --no-usb          No detectar dispositivos por USB (por defecto arma el túnel y abre la app sola)
           --list-displays   Lista pantallas y salidas DXGI, y termina
           --verbose         Log detallado
           --help            Muestra esta ayuda
@@ -54,8 +67,16 @@ internal sealed class HostOptions
     /// <summary>Null: la última posición en la que el usuario dejó el monitor virtual.</summary>
     public DisplayPosition? Position { get; set; }
     public int Monitor { get; set; }
-    public int Fps { get; set; } = 60;
+    /// <summary>Null: la frecuencia de la pantalla del dispositivo (ver <see cref="Video.StreamTuning.ChooseFps"/>).</summary>
+    public int? Fps { get; set; }
+
+    /// <summary>
+    /// Bitrate máximo. Con <see cref="ScaleBitrate"/> es la referencia para 2304×1440 a 60 fps y se
+    /// ajusta a la resolución y los fps del dispositivo; si no, es el valor exacto.
+    /// </summary>
     public int BitrateMbps { get; set; } = 12;
+
+    public bool ScaleBitrate { get; set; } = true;
 
     /// <summary>Bajar el bitrate si la red se congestiona (<see cref="BitrateMbps"/> es el máximo).</summary>
     public bool AdaptiveBitrate { get; set; } = true;
@@ -65,10 +86,13 @@ internal sealed class HostOptions
     public bool ShowHelp { get; set; }
     public bool ListDisplays { get; set; }
 
-    /// <summary>Escala de Windows para el monitor de la tablet (100, 125, 150...). Null: no tocarla.</summary>
+    /// <summary>Escala de Windows para el monitor del dispositivo (100, 125, 150...). Null: no tocarla.</summary>
     public int? ScalePercent { get; set; }
 
-    /// <summary>Detectar tablets por USB, armar el túnel y abrir la app (requiere adb).</summary>
+    /// <summary>Elegir la escala según la densidad de la pantalla del dispositivo (gana sobre <see cref="ScalePercent"/>).</summary>
+    public bool AutoScale { get; set; }
+
+    /// <summary>Detectar dispositivos por USB, armar el túnel y abrir la app (requiere adb).</summary>
     public bool UsbAutoConnect { get; set; } = true;
 
     public static HostOptions Parse(IReadOnlyList<string> args)
@@ -96,6 +120,7 @@ internal sealed class HostOptions
                     break;
                 case "--bitrate":
                     options.BitrateMbps = ParseInt(arg, NextValue(args, ref i), 1, 200);
+                    options.ScaleBitrate = false;
                     break;
                 case "--fixed-bitrate":
                     options.AdaptiveBitrate = false;
@@ -110,7 +135,9 @@ internal sealed class HostOptions
                     options.ListDisplays = true;
                     break;
                 case "--scale":
-                    options.ScalePercent = ParseInt(arg, NextValue(args, ref i), 100, 500);
+                    var scale = NextValue(args, ref i);
+                    if (string.Equals(scale, "auto", StringComparison.OrdinalIgnoreCase)) options.AutoScale = true;
+                    else options.ScalePercent = ParseInt(arg, scale, 100, 500);
                     break;
                 case "--no-usb":
                     options.UsbAutoConnect = false;

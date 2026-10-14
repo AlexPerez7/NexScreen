@@ -67,7 +67,15 @@ no está firmado, así que Windows SmartScreen muestra una advertencia al descar
 - Con una licencia OSI, SignPath Foundation firma gratis proyectos open source (la misma que firma
   el Virtual Display Driver). Integrarlo en `release.yml`.
 
-### 5. 90 Hz — S/M
+### 5. 90 Hz — ✅ hecho (0.6.0)
+
+Generalizado: la app informa la frecuencia en HELLO y el host transmite a 60, 90 o 120 fps (ver
+CLAUDE.md, "Ajustes según el dispositivo y la GPU"). Falta medir si Quick Sync y el WiFi sostienen
+90 fps en la tablet.
+
+<details><summary>Notas originales</summary>
+
+### 90 Hz — S/M
 
 **Qué:** la Galaxy Tab S9 FE tiene pantalla de 90 Hz; hoy se transmite a 60 fps.
 
@@ -76,6 +84,8 @@ no está firmado, así que Windows SmartScreen muestra una advertencia al descar
 - El host agrega `2304x1440@90` al XML del driver (`VddSettings.EnsureResolution` ya lo soporta)
   y usa `framerate=90` en ddagrab.
 - Verificar que Quick Sync y la red sostengan 90 fps; opción "Fluidez" en la bandeja.
+
+</details>
 
 ### 6. Audio del PC en la tablet — M
 

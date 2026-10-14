@@ -7,6 +7,16 @@ Lo nuevo de cada versión de NexScreen. Cada release de GitHub muestra la secci�
 
 ### Novedades
 
+- **Funciona con más equipos.** Además de Intel Quick Sync, NexScreen codifica el video con
+  **NVIDIA (NVENC)** y **AMD (AMF)**, y elige solo el de la GPU a la que está conectada la pantalla
+  (también en PCs con dos GPU). Si ninguno funciona prueba Media Foundation por GPU y, al final, por CPU.
+- **Celulares además de tablets.** El video ya no queda debajo de la cámara (perforación o muesca):
+  el monitor se crea con el área libre de la pantalla.
+- **Hasta 120 fps.** Se transmite a la frecuencia de la pantalla del dispositivo (60, 90 o 120 Hz)
+  y la app le pide a Android que la use. Con un encoder por CPU se queda en 60 fps.
+- **Escala automática.** La escala de Windows se elige según la densidad de la pantalla
+  (150 % en una tablet de 11", más en un celular). Es la opción nueva por defecto de "Escala";
+  si ya tenías una elegida, se mantiene.
 - **Bitrate adaptativo.** Si el WiFi no da abasto, NexScreen baja la calidad del video en vez de
   acumular atraso, y la vuelve a subir de a poco cuando la red se recupera. La calidad elegida en
   la bandeja ("Alta", "Normal", "Ahorro") es ahora el máximo. Mientras está reducida, la bandeja
@@ -14,6 +24,8 @@ Lo nuevo de cada versión de NexScreen. Cada release de GitHub muestra la secci�
 
 ### Mejoras
 
+- La calidad ("Alta", "Normal", "Ahorro") se ajusta a la resolución y los fps del dispositivo: un
+  celular de 120 Hz recibe más bitrate que una tablet de 60 Hz con la misma opción.
 - Si la tablet tiene un error al decodificar el video, se recupera sola en menos de un segundo
   (le pide al PC una imagen completa) en vez de cortar la conexión.
 - Los reinicios de la captura (por ejemplo, al reordenar las pantallas) ya no reinician el

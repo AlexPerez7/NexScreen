@@ -73,14 +73,14 @@ internal static class VirtualDisplay
         Log.Info($"Monitor virtual {gdiName}: {width}x{height}@{refreshRate} en ({x},{y})");
 
         await WaitUntilAsync(
-            () => DxgiOutputs.FindIndex(gdiName) is not null,
+            () => DxgiOutputs.Find(gdiName) is not null,
             OutputTimeout, $"DXGI no expone {gdiName}", ct).ConfigureAwait(false);
         return gdiName;
     }
 
-    /// <summary>Índice DXGI actual del monitor virtual (cambia si se reordenan las pantallas).</summary>
-    public static int OutputIndex(string gdiName) =>
-        DxgiOutputs.FindIndex(gdiName)
+    /// <summary>Salida DXGI actual del monitor virtual (el índice cambia si se reordenan las pantallas).</summary>
+    public static CaptureTarget CaptureTarget(string gdiName) =>
+        DxgiOutputs.Find(gdiName)?.Target
         ?? throw new InvalidOperationException($"El monitor virtual {gdiName} ya no está en el escritorio");
 
     /// <summary>
@@ -120,14 +120,24 @@ internal static class VirtualDisplay
     internal static (int X, int Y) ChoosePosition(
         IReadOnlyList<DisplayInfo> physical, int width, int height, DisplayPosition? position, HostState state)
     {
-        if (position is null
-            && state is { VirtualDisplayX: { } x, VirtualDisplayY: { } y }
-            && IsValidPlacement(physical, x, y, width, height))
+        if (position is null && state is { VirtualDisplayX: { } x, VirtualDisplayY: { } y })
         {
-            return (x, y);
+            if (IsValidPlacement(physical, x, y, width, height)) return (x, y);
+            // No entra: otro dispositivo con otro tamaño, o cambiaron los monitores. Respetar al
+            // menos el lado que eligió el usuario (si no, se guardaría el lado por defecto encima).
+            position = SideOf(physical, x, y);
         }
 
         return ComputePosition(physical, width, height, position ?? DisplayPosition.Right);
+    }
+
+    /// <summary>De qué lado de los monitores reales está el punto (x, y) de una posición guardada.</summary>
+    internal static DisplayPosition SideOf(IReadOnlyList<DisplayInfo> physical, int x, int y)
+    {
+        if (physical.Count == 0) return DisplayPosition.Right;
+        if (x < physical.Min(d => d.X)) return DisplayPosition.Left;
+        if (x >= physical.Max(d => d.X + d.Width)) return DisplayPosition.Right;
+        return y < physical.Min(d => d.Y) ? DisplayPosition.Above : DisplayPosition.Below;
     }
 
     /// <summary>Válida si no se superpone con ningún monitor y comparte un borde con alguno.</summary>

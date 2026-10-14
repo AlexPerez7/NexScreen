@@ -33,7 +33,7 @@ Enteros en big-endian. Payload máximo: 16 MiB.
 
 | Tipo | Nombre | Dirección | Payload |
 |------|--------|-----------|---------|
-| 0x01 | HELLO  | tablet → host | JSON `{"protocol":2,"device":"samsung SM-X510","width":2304,"height":1440,"dpi":274,"paired":true}` |
+| 0x01 | HELLO  | tablet → host | JSON `{"protocol":2,"device":"samsung SM-X510","width":2304,"height":1440,"dpi":280,"refreshRate":90,"paired":true}` |
 | 0x02 | CONFIG | host → tablet | JSON `{"protocol":2,"codec":"h264","maxWidth":2304,"maxHeight":1440,"fps":60}` |
 | 0x03 | PAIR_REQUIRED | host → tablet | JSON `{"host":"ALEXP-PC"}` (solo WiFi) |
 | 0x04 | PAIR | tablet → host | JSON `{"proof":"<hex>"}` |
@@ -91,6 +91,20 @@ una por una. Un `move` de un dedo desconocido se trata como `down`.
 
 `paired` en HELLO: la tablet ya confía en el certificado de este host (lo tiene guardado). Por
 USB se ignora.
+
+### Campos de HELLO que dependen del dispositivo
+
+"Tablet" en este documento es cualquier dispositivo Android con la app: tablet o celular.
+
+| Campo | Qué es | Para qué lo usa el host |
+|-------|--------|-------------------------|
+| `width`, `height` | Píxeles físicos de la pantalla **sin la zona de la cámara** (perforación o muesca), en cualquier orientación | Resolución del monitor virtual y tamaño máximo del video (el lado largo es el ancho; se redondea a par) |
+| `dpi` | Densidad de Android (`densityDpi`), que ya tiene en cuenta la distancia de uso | Escala automática de Windows: `dpi × 150 / 280`, al paso más cercano (280 → 150 %, 450 → 250 %) |
+| `refreshRate` | Frecuencia máxima de la pantalla en Hz a su resolución actual (opcional, desde la 0.6.0) | fps de la captura y frecuencia del monitor virtual (entre 30 y 120; 60 si falta). Con un encoder por CPU se capturan como mucho 60 fps |
+
+El bitrate máximo también se ajusta al dispositivo: la "calidad" del host es la referencia para
+2304×1440 a 60 fps y se escala por la cantidad de píxeles y por √(fps / 60), entre 2 y 80 Mbps.
+`refreshRate` se agregó sin subir la versión: un host viejo lo ignora y una app vieja no lo envía.
 
 ## Emparejamiento (solo WiFi)
 

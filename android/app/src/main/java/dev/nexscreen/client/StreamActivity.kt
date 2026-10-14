@@ -6,9 +6,11 @@ import android.os.Handler
 import android.os.Looper
 import android.text.InputFilter
 import android.text.InputType
+import android.view.Display
 import android.view.Gravity
 import android.view.SurfaceHolder
 import android.view.View
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
@@ -18,6 +20,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -32,6 +35,7 @@ import dev.nexscreen.client.net.StreamClient
 import dev.nexscreen.client.net.StreamStats
 import dev.nexscreen.client.net.TrustedHosts
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * Pantalla completa que muestra el video del PC. La conexión vive mientras exista el
@@ -47,6 +51,7 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
     private val handler = Handler(Looper.getMainLooper())
     private val trustedHosts by lazy { TrustedHosts(this) }
     private var pairingDialog: AlertDialog? = null
+    private var displayMode: Display.Mode? = null
 
     private val host by lazy { intent.getStringExtra(EXTRA_HOST) ?: "127.0.0.1" }
     private val port by lazy { intent.getIntExtra(EXTRA_PORT, Protocol.DEFAULT_PORT) }
@@ -62,6 +67,15 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
         hideSystemBars()
+        displayMode = preferHighestRefreshRate()
+
+        // El video no va debajo de la cámara de los celulares (perforación o muesca): se deja ese
+        // borde en negro y el PC recibe el tamaño del área que queda libre (ver displayInfo()).
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val cutout = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.displayCutout())
+            view.setPadding(cutout.left, cutout.top, cutout.right, cutout.bottom)
+            insets
+        }
 
         binding.stats.isVisible = intent.getBooleanExtra(EXTRA_SHOW_STATS, false)
         binding.surface.holder.addCallback(this)
@@ -108,24 +122,50 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
         client = null
     }
 
-    /** Resolución física de la pantalla, para que el host no mande más píxeles de los necesarios. */
+    /**
+     * Resolución física de la pantalla sin la zona de la cámara, para que el host no mande más
+     * píxeles de los necesarios, y su frecuencia máxima (60, 90, 120 Hz...) para los fps.
+     */
     @Suppress("DEPRECATION")
     private fun displayInfo(): DisplayInfo {
         val (width, height) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val bounds = windowManager.maximumWindowMetrics.bounds
-            bounds.width() to bounds.height()
+            val metrics = windowManager.maximumWindowMetrics
+            val cutout = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.displayCutout())
+            (metrics.bounds.width() - cutout.left - cutout.right) to (metrics.bounds.height() - cutout.top - cutout.bottom)
         } else {
             val metrics = android.util.DisplayMetrics()
             windowManager.defaultDisplay.getRealMetrics(metrics)
-            metrics.widthPixels to metrics.heightPixels
+            val cutout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                window.decorView.rootWindowInsets?.displayCutout
+            } else null
+            val horizontal = (cutout?.safeInsetLeft ?: 0) + (cutout?.safeInsetRight ?: 0)
+            val vertical = (cutout?.safeInsetTop ?: 0) + (cutout?.safeInsetBottom ?: 0)
+            (metrics.widthPixels - horizontal) to (metrics.heightPixels - vertical)
         }
-        return DisplayInfo(width, height, resources.displayMetrics.densityDpi)
+        val refreshRate = displayMode?.refreshRate?.roundToInt() ?: DEFAULT_REFRESH_RATE
+        return DisplayInfo(width, height, resources.displayMetrics.densityDpi, refreshRate)
+    }
+
+    /**
+     * Pide la frecuencia más alta que admite la pantalla a su resolución actual: sin esto, los
+     * celulares y tablets con frecuencia adaptativa pueden quedarse en 60 Hz con el video.
+     */
+    @Suppress("DEPRECATION")
+    private fun preferHighestRefreshRate(): Display.Mode {
+        val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display!! else windowManager.defaultDisplay
+        val current = display.mode
+        val best = display.supportedModes
+            .filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
+            .maxByOrNull { it.refreshRate } ?: current
+        window.attributes = window.attributes.apply { preferredDisplayModeId = best.modeId }
+        return best
     }
 
     /** Ajusta el SurfaceView al aspecto del video (letterbox) para no deformarlo. */
     private fun fitSurfaceToVideo() {
-        val containerWidth = binding.root.width
-        val containerHeight = binding.root.height
+        val root = binding.root
+        val containerWidth = root.width - root.paddingLeft - root.paddingRight
+        val containerHeight = root.height - root.paddingTop - root.paddingBottom
         if (videoWidth == 0 || videoHeight == 0 || containerWidth == 0 || containerHeight == 0) return
 
         val scale = minOf(containerWidth.toFloat() / videoWidth, containerHeight.toFloat() / videoHeight)
@@ -145,7 +185,7 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
         binding.status.isVisible = true
     }
 
-    /** El PC no conoce esta tablet (o la tablet no conoce el PC): pedir el PIN que muestra el PC. */
+    /** El PC no conoce este dispositivo (o el dispositivo no conoce el PC): pedir el PIN que muestra el PC. */
     override fun onPairingRequired(hostName: String, error: String?) = runOnUiThread {
         if (isFinishing || isDestroyed) return@runOnUiThread
         dismissPairingDialog()
@@ -265,6 +305,7 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
 
     companion object {
         private const val RECONNECT_DELAY_MS = 1500L
+        private const val DEFAULT_REFRESH_RATE = 60
 
         /** ~30 s de reintentos. */
         private const val MAX_RECONNECT_ATTEMPTS = 20

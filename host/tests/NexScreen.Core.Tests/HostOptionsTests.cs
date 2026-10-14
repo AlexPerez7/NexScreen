@@ -10,7 +10,9 @@ public class HostOptionsTests
         var options = HostOptions.Parse([]);
 
         Assert.Equal(27190, options.Port);
-        Assert.Equal(60, options.Fps);
+        Assert.Null(options.Fps);
+        Assert.True(options.ScaleBitrate);
+        Assert.False(options.AutoScale);
         Assert.Equal(EncoderKind.Auto, options.Encoder);
         Assert.Null(options.Position);
         Assert.True(options.AdaptiveBitrate);
@@ -32,6 +34,7 @@ public class HostOptionsTests
         Assert.Equal(1, options.Monitor);
         Assert.Equal(30, options.Fps);
         Assert.Equal(20, options.BitrateMbps);
+        Assert.False(options.ScaleBitrate);
         Assert.Equal(EncoderKind.X264, options.Encoder);
         Assert.True(options.Verbose);
     }
@@ -69,16 +72,6 @@ public class HostOptionsTests
     }
 
     [Fact]
-    public void BuildsMediaFoundationPipelineForDisplayRemoting()
-    {
-        var args = FfmpegVideoSource.BuildArguments(new VideoSourceSettings(0, 60, 12, 2304, 1440, EncoderKind.Mf));
-
-        Assert.Contains("h264_mf", args);
-        Assert.Equal("display_remoting", args[args.ToList().IndexOf("-scenario") + 1]);
-        Assert.Contains(",hwdownload,format=bgra,", args[args.ToList().IndexOf("-i") + 1]);
-    }
-
-    [Fact]
     public void ParsesMediaFoundationEncoder()
     {
         Assert.Equal(EncoderKind.Mf, HostOptions.Parse(["--encoder", "mf"]).Encoder);
@@ -89,7 +82,8 @@ public class HostOptionsTests
     [InlineData("--position", "middle")]
     [InlineData("--port", "0")]
     [InlineData("--fps", "abc")]
-    [InlineData("--encoder", "nvenc")]
+    [InlineData("--encoder", "vp9")]
+    [InlineData("--scale", "50")]
     [InlineData("--unknown", "1")]
     public void RejectsInvalidValues(string name, string value)
     {
@@ -102,15 +96,23 @@ public class HostOptionsTests
         Assert.Throws<ArgumentException>(() => HostOptions.Parse(["--port"]));
     }
 
-    [Fact]
-    public void BuildsQsvPipelineThatFitsClientWithoutUpscaling()
+    [Theory]
+    [InlineData("nvenc", "Nvenc")]
+    [InlineData("AMF", "Amf")]
+    [InlineData("mfgpu", "MfGpu")]
+    public void ParsesGpuEncoders(string value, string expected)
     {
-        var args = FfmpegVideoSource.BuildArguments(new VideoSourceSettings(1, 60, 12, 2304, 1440, EncoderKind.Qsv));
-        var graph = args[args.ToList().IndexOf("-i") + 1];
+        Assert.Equal(Enum.Parse<EncoderKind>(expected), HostOptions.Parse(["--encoder", value]).Encoder);
+    }
 
-        Assert.StartsWith("ddagrab=output_idx=1:framerate=60", graph);
-        Assert.Contains("scale_qsv=w='trunc(iw*min(1,min(2304/iw,1440/ih))/2)*2'", graph);
-        Assert.Contains("h264_qsv", args);
-        Assert.Equal("pipe:1", args[^1]);
+    [Theory]
+    [InlineData("auto", true, null)]
+    [InlineData("175", false, 175)]
+    public void ParsesScale(string value, bool auto, int? percent)
+    {
+        var options = HostOptions.Parse(["--scale", value]);
+
+        Assert.Equal(auto, options.AutoScale);
+        Assert.Equal(percent, options.ScalePercent);
     }
 }

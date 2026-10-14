@@ -93,6 +93,10 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=27190)
     parser.add_argument("--seconds", type=float, default=5)
     parser.add_argument("--out", default="capture.h264")
+    parser.add_argument("--width", type=int, default=2304, help="ancho de la pantalla simulada (apaisada)")
+    parser.add_argument("--height", type=int, default=1440, help="alto de la pantalla simulada")
+    parser.add_argument("--dpi", type=int, default=280, help="densidad de Android (para la escala automática)")
+    parser.add_argument("--refresh-rate", type=int, default=60, help="frecuencia de la pantalla en Hz (0: no informarla)")
     parser.add_argument("--pen-hover", action="store_true", help="probar la inyección de lápiz sin hacer clic")
     parser.add_argument("--pin", help="PIN de emparejamiento (por WiFi); si falta, se pregunta")
     parser.add_argument("--identity", type=Path, default=Path.home() / ".nexscreen-fake-client")
@@ -126,8 +130,8 @@ def main() -> None:
         print(f"TLS {sock.version()}, huella del host {host_fp[:16]}…, "
               f"{'de confianza' if host_fp in trusted else 'desconocido'}")
 
-    hello = {"protocol": PROTOCOL, "device": "fake-client", "width": 1440, "height": 2304, "dpi": 274,
-             "paired": host_fp in trusted}
+    hello = {"protocol": PROTOCOL, "device": "fake-client", "width": args.height, "height": args.width,
+             "dpi": args.dpi, "refreshRate": args.refresh_rate, "paired": host_fp in trusted}
     send(sock, HELLO, json.dumps(hello).encode())
 
     frames = keyframes = total = 0

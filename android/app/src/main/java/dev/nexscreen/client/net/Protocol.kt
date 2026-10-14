@@ -17,6 +17,7 @@ object Protocol {
     const val DISCOVERY_PORT = 27191
     const val MAX_PAYLOAD = 16 * 1024 * 1024
 
+    /** JSON con la pantalla del dispositivo: width, height, dpi y refreshRate (ver docs/protocol.md). */
     const val TYPE_HELLO = 0x01
     const val TYPE_CONFIG = 0x02
     const val TYPE_PAIR_REQUIRED = 0x03
