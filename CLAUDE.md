@@ -22,8 +22,7 @@ NexScreen convierte una tablet Android (desarrollado con una Samsung Galaxy Tab 
 | 3 | Táctil y S Pen (presión) hacia Windows | ✅ |
 | 4 | App de bandeja, autoconexión, instalador, releases | ✅ |
 
-Plan de la fase 4: 4a app de bandeja · 4b autoconexión USB · 4c descubrimiento WiFi ·
-4d escala automática · 4e instalador (Inno Setup) · 4f releases con GitHub Actions + APK firmado.
+Ideas para próximas versiones, priorizadas y con notas técnicas: `PLAN.md`.
 
 ## Estructura
 
