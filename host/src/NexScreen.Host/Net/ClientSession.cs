@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text.Json;
 using NexScreen.Host.Display;
+using NexScreen.Host.Input;
 using NexScreen.Host.Protocol;
 using NexScreen.Host.Video;
 
@@ -16,8 +17,11 @@ internal sealed class ClientSession
     private static readonly TimeSpan RestartDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan RestartWindow = TimeSpan.FromSeconds(30);
     private const int MaxRestartsPerWindow = 10;
+    private static readonly TimeSpan ScreenCacheTtl = TimeSpan.FromSeconds(1);
+    private const int MaxInputErrorsLogged = 5;
 
     private readonly HostOptions _options;
+    private int _inputErrorsLogged;
 
     public ClientSession(HostOptions options) => _options = options;
 
@@ -71,7 +75,8 @@ internal sealed class ClientSession
     private async Task StreamAsync(MessageChannel channel, Func<int> resolveMonitor, int maxWidth, int maxHeight, CancellationToken ct)
     {
         using var sessionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var receive = ReceiveLoopAsync(channel, sessionCts.Token);
+        using var injector = new PointerInjector(CachedScreen(resolveMonitor));
+        var receive = ReceiveLoopAsync(channel, injector, sessionCts.Token);
         var video = StreamVideoAsync(channel, resolveMonitor, maxWidth, maxHeight, sessionCts.Token);
 
         var finished = await Task.WhenAny(receive, video).ConfigureAwait(false);
@@ -108,7 +113,27 @@ internal sealed class ClientSession
         return hello;
     }
 
-    private static async Task ReceiveLoopAsync(MessageChannel channel, CancellationToken ct)
+    /// <summary>
+    /// Rectángulo del monitor capturado para mapear el input. Se cachea un momento porque llegan
+    /// cientos de eventos por segundo, y se refresca por si el usuario mueve el monitor.
+    /// </summary>
+    private static Func<ScreenRect> CachedScreen(Func<int> resolveMonitor)
+    {
+        ScreenRect? cached = null;
+        var age = Stopwatch.StartNew();
+        return () =>
+        {
+            if (cached is null || age.Elapsed > ScreenCacheTtl)
+            {
+                cached = DxgiOutputs.Bounds(resolveMonitor());
+                age.Restart();
+            }
+
+            return cached.Value;
+        };
+    }
+
+    private async Task ReceiveLoopAsync(MessageChannel channel, PointerInjector injector, CancellationToken ct)
     {
         while (await channel.ReadAsync(ct).ConfigureAwait(false) is { } message)
         {
@@ -116,6 +141,9 @@ internal sealed class ClientSession
             {
                 case MessageType.Ping:
                     await channel.WriteAsync(MessageType.Pong, message.Payload, ct).ConfigureAwait(false);
+                    break;
+                case MessageType.Pointer:
+                    InjectPointer(injector, message.Payload);
                     break;
                 case MessageType.Pong:
                     break;
@@ -126,6 +154,19 @@ internal sealed class ClientSession
         }
 
         Log.Info("El cliente cerró la conexión");
+    }
+
+    /// <summary>Un error de input no debe cortar el video: se registra (con límite) y se sigue.</summary>
+    private void InjectPointer(PointerInjector injector, byte[] payload)
+    {
+        try
+        {
+            injector.Inject(PointerMessage.Parse(payload));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            if (_inputErrorsLogged++ < MaxInputErrorsLogged) Log.Warn($"Input descartado: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -185,6 +226,20 @@ internal sealed class ClientSession
             recentRestarts.Enqueue(now);
             Log.Warn($"La captura se interrumpió ({FirstLine(diagnostics)}); reiniciando");
             await Task.Delay(RestartDelay, ct).ConfigureAwait(false);
+            // La causa más común es que el usuario movió el monitor: guardar dónde lo dejó.
+            if (_options.Mode == ScreenMode.Extend) TryRememberPosition();
+        }
+    }
+
+    private static void TryRememberPosition()
+    {
+        try
+        {
+            VirtualDisplay.RememberPosition();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Log.Warn($"No se pudo guardar la posición del monitor virtual: {ex.Message}");
         }
     }
 

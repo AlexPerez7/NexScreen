@@ -90,19 +90,28 @@ internal static class VirtualDisplay
     /// </summary>
     public static void Detach(bool rememberPosition)
     {
+        if (DisplayConfig.VirtualSourceName() is null) return;
+        if (rememberPosition) RememberPosition();
+        if (DisplayConfig.DetachVirtual()) Log.Info("Monitor virtual quitado del escritorio");
+    }
+
+    /// <summary>
+    /// Guarda la posición actual del monitor virtual. Se llama al cerrar la sesión y también cuando
+    /// el usuario reordena las pantallas, para no perderla si el host se cierra a la fuerza.
+    /// </summary>
+    public static void RememberPosition()
+    {
         var gdiName = DisplayConfig.VirtualSourceName();
         if (gdiName is null) return;
+        if (DisplayDevices.List().FirstOrDefault(d => d.DeviceName == gdiName && d.Attached) is not { } current) return;
 
-        if (rememberPosition
-            && DisplayDevices.List().FirstOrDefault(d => d.DeviceName == gdiName && d.Attached) is { } current)
-        {
-            var state = HostState.Load();
-            state.VirtualDisplayX = current.X;
-            state.VirtualDisplayY = current.Y;
-            state.Save();
-        }
+        var state = HostState.Load();
+        if (state.VirtualDisplayX == current.X && state.VirtualDisplayY == current.Y) return;
 
-        if (DisplayConfig.DetachVirtual()) Log.Info("Monitor virtual quitado del escritorio");
+        state.VirtualDisplayX = current.X;
+        state.VirtualDisplayY = current.Y;
+        state.Save();
+        Log.Info($"Posición del monitor virtual guardada: ({current.X},{current.Y})");
     }
 
     private static bool HasMode(string deviceName, int width, int height, int refreshRate) =>

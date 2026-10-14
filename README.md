@@ -16,7 +16,7 @@ docs/      Protocolo de red
 |------|-----------|--------|
 | 1 | Espejo de un monitor existente → tablet (USB y WiFi) | ✅ |
 | 2 | Monitor virtual (driver IddCx) para **extender** el escritorio | ✅ |
-| 3 | Input táctil y S Pen (presión) hacia Windows | Pendiente |
+| 3 | Input táctil y S Pen (presión) hacia Windows | ✅ |
 | 4 | App de bandeja, autoconexión, perfiles, instalador | Pendiente |
 
 ## Cómo funciona
@@ -36,6 +36,10 @@ monitor virtual (Virtual Display Driver, 2304x1440)
   aparece en el mismo lugar (`%APPDATA%\NexScreen\host-state.json`).
 - Si Windows invalida la captura (reordenar pantallas, cambiar resolución, UAC), el host la
   reinicia sin cortar la conexión.
+- **Táctil y S Pen:** los toques y el lápiz se inyectan como táctil y lápiz reales de Windows
+  (`InjectSyntheticPointerInput`): tocar es clic, mantener es clic derecho, dos dedos desplazan
+  y hacen zoom, y el lápiz tiene presión, inclinación y botón lateral. Mientras el lápiz está
+  cerca se ignoran los dedos (rechazo de palma). No funciona sobre ventanas elevadas (UIPI).
 - **Modo espejo** (`--mode mirror`, o si no está el driver): transmite un monitor existente.
 - La captura y la codificación la hace **ffmpeg** como subproceso, detrás de la interfaz
   `IVideoSource` para poder reemplazarla por un pipeline nativo Media Foundation.

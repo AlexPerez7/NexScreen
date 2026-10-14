@@ -26,6 +26,22 @@ internal static class DxgiOutputs
         }
     }
 
+    /// <summary>Rectángulo en el escritorio de la salida DXGI indicada.</summary>
+    public static Input.ScreenRect Bounds(int index)
+    {
+        using var factory = DXGI.CreateDXGIFactory1<IDXGIFactory1>();
+        factory.EnumAdapters1(0, out var adapter).CheckError();
+        using (adapter)
+        {
+            adapter.EnumOutputs((uint)index, out var output).CheckError();
+            using (output)
+            {
+                var rect = output.Description.DesktopCoordinates;
+                return new Input.ScreenRect(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
+            }
+        }
+    }
+
     public static int? FindIndex(string deviceName)
     {
         var outputs = ListDefaultAdapterOutputs();

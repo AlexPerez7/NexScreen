@@ -22,6 +22,7 @@ Enteros en big-endian. Payload máximo: 16 MiB.
 | 0x01 | HELLO  | tablet → host | JSON `{"protocol":1,"device":"samsung SM-X510","width":2304,"height":1440,"dpi":274}` |
 | 0x02 | CONFIG | host → tablet | JSON `{"protocol":1,"codec":"h264","maxWidth":2304,"maxHeight":1440,"fps":60}` |
 | 0x10 | VIDEO  | host → tablet | `[i64 ptsUs][u8 flags][access unit H.264 Annex-B]` |
+| 0x20 | POINTER | tablet → host | `[u8 cantidad]` + cantidad × entrada de 12 bytes (ver abajo) |
 | 0x30 | PING   | ambos | `[i64 timestamp µs del emisor]` |
 | 0x31 | PONG   | ambos | eco exacto del payload del PING |
 
@@ -32,6 +33,26 @@ Enteros en big-endian. Payload máximo: 16 MiB.
 | 0x01 | Keyframe (IDR) |
 | 0x02 | Configuración del codec (solo SPS/PPS); se pasa al decoder con `BUFFER_FLAG_CODEC_CONFIG` |
 
+### Entrada de POINTER (12 bytes)
+
+```
+[u8 id][u8 herramienta][u8 acción][u8 botones][u16 x][u16 y][u16 presión][i8 tiltX][i8 tiltY]
+```
+
+| Campo | Valores |
+|-------|---------|
+| id | Id del puntero en Android (`getPointerId`) |
+| herramienta | 0 dedo, 1 lápiz, 2 borrador |
+| acción | 0 down, 1 move, 2 up, 3 cancel, 4 hover (lápiz cerca sin tocar), 5 hover-exit |
+| botones | bit 0: botón lateral del lápiz |
+| x, y | 0..65535 sobre el área del video (0 = izquierda/arriba) |
+| presión | 0..65535 (los dedos envían 65535) |
+| tiltX, tiltY | Inclinación del lápiz en grados, −90..90 |
+
+Todas las entradas de dedos de un mensaje forman **un frame**: el host las inyecta juntas con
+`InjectSyntheticPointerInput`, como exige Windows para el multitáctil. Las del lápiz se inyectan
+una por una. Un `move` de un dedo desconocido se trata como `down`.
+
 ## Secuencia
 
 1. La tablet conecta y envía **HELLO** con la resolución física de la pantalla.
@@ -39,10 +60,12 @@ Enteros en big-endian. Payload máximo: 16 MiB.
    `maxWidth × maxHeight` conservando el aspecto, **sin agrandar**; el tamaño real lo
    informa el decoder (`INFO_OUTPUT_FORMAT_CHANGED`).
 3. El host envía un VIDEO de configuración (SPS/PPS) y luego frames, empezando por un keyframe.
-4. La tablet envía PING cada segundo para medir el RTT.
+4. La tablet envía PING cada segundo para medir el RTT, y POINTER con cada toque o movimiento del lápiz.
 5. Cualquiera de los dos puede cerrar el socket para terminar la sesión.
 
 ## Compatibilidad
 
 Una versión de protocolo distinta entre host y tablet aborta la sesión en el handshake.
-Cambios previstos para v2: mensajes de input (táctil/S Pen), pedido de keyframe y bitrate adaptativo.
+Los tipos de mensaje nuevos se agregan sin subir la versión si el otro extremo puede ignorarlos
+(POINTER se agregó así: un host viejo lo descarta). Cambios previstos: pedido de keyframe y
+bitrate adaptativo.

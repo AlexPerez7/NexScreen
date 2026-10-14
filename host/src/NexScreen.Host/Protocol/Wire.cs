@@ -27,6 +27,9 @@ internal enum MessageType : byte
     Hello = 0x01,
     Config = 0x02,
     Video = 0x10,
+
+    /// <summary>Tablet → host: dedos y lápiz. Ver PointerMessage.</summary>
+    Pointer = 0x20,
     Ping = 0x30,
     Pong = 0x31,
 }

@@ -7,9 +7,12 @@ import android.view.Surface
 import dev.nexscreen.client.video.VideoDecoder
 import org.json.JSONObject
 import java.io.EOFException
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.ByteBuffer
+import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicInteger
 
 data class DisplayInfo(val width: Int, val height: Int, val dpi: Int)
@@ -42,7 +45,13 @@ class StreamClient(
 
     @Volatile
     private var socket: Socket? = null
+
+    @Volatile
+    private var channel: MessageChannel? = null
     private var thread: Thread? = null
+
+    // Android no permite escribir en la red desde el hilo de UI, que es donde llegan los toques.
+    private val inputExecutor = Executors.newSingleThreadExecutor { Thread(it, "nexscreen-input") }
 
     private val renderedFrames = AtomicInteger()
     private var receivedBytes = 0L
@@ -55,8 +64,26 @@ class StreamClient(
 
     fun stop() {
         running = false
+        channel = null
+        inputExecutor.shutdownNow()
         socket?.close()
         thread?.join(1000)
+    }
+
+    /** Envía un mensaje POINTER. Se descarta si todavía no hay conexión. */
+    fun sendPointer(payload: ByteArray) {
+        val channel = channel ?: return
+        try {
+            inputExecutor.execute {
+                try {
+                    channel.write(Protocol.TYPE_POINTER, payload)
+                } catch (e: IOException) {
+                    // El hilo de red detecta la desconexión y la informa.
+                }
+            }
+        } catch (e: RejectedExecutionException) {
+            // Cliente detenido.
+        }
     }
 
     private fun run() {
@@ -75,6 +102,7 @@ class StreamClient(
 
             val channel = MessageChannel(socket)
             channel.write(Protocol.TYPE_HELLO, helloPayload())
+            this.channel = channel
 
             var lastPing = 0L
             var lastStats = SystemClock.elapsedRealtime()
@@ -152,6 +180,7 @@ class StreamClient(
                 Log.w(TAG, "Conexión terminada", t)
             }
         } finally {
+            channel = null
             decoder?.release()
             socket?.close()
             if (running) listener.onDisconnected(error)

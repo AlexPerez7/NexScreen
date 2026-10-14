@@ -13,6 +13,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.isVisible
 import dev.nexscreen.client.databinding.ActivityStreamBinding
+import dev.nexscreen.client.input.PointerForwarder
 import dev.nexscreen.client.net.DisplayInfo
 import dev.nexscreen.client.net.Protocol
 import dev.nexscreen.client.net.StreamClient
@@ -64,12 +65,19 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
-        client = StreamClient(host, port, holder.surface, displayInfo(), this).also { it.start() }
+        val client = StreamClient(host, port, holder.surface, displayInfo(), this).also { it.start() }
+        this.client = client
+        // Los toques sobre el video se reenvían al PC como táctil y lápiz de Windows.
+        val forwarder = PointerForwarder(client::sendPointer)
+        binding.surface.setOnTouchListener(forwarder)
+        binding.surface.setOnGenericMotionListener(forwarder)
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
+        binding.surface.setOnTouchListener(null)
+        binding.surface.setOnGenericMotionListener(null)
         client?.stop()
         client = null
     }

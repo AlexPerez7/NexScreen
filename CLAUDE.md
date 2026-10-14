@@ -19,7 +19,7 @@ NexScreen convierte una tablet Android (desarrollado con una Samsung Galaxy Tab 
 |------|-----------|--------|
 | 1 | Espejo de un monitor → tablet | ✅ |
 | 2 | Monitor virtual para extender el escritorio | ✅ |
-| 3 | Táctil y S Pen (presión) hacia Windows | En curso |
+| 3 | Táctil y S Pen (presión) hacia Windows | ✅ |
 | 4 | App de bandeja, autoconexión, perfiles, instalador | Pendiente |
 
 ## Estructura
@@ -30,6 +30,7 @@ host/src/NexScreen.Host/      Servidor Windows (C# / .NET 8, net8.0-windows) -> 
   Video/                      ffmpeg (ddagrab + h264_qsv/x264) -> FLV -> Annex-B
   Net/                        StreamServer (acepta conexiones), ClientSession (una sesión)
   Display/                    Monitor virtual: API CCD, GDI, DXGI, driver VDD
+  Input/                      Táctil y lápiz: mensaje POINTER, traductor de frames, inyección Win32
 host/tests/NexScreen.Host.Tests/  xUnit
 host/tools/fake_client.py     Cliente que simula la tablet (prueba sin hardware)
 android/app/                  App Kotlin (paquete dev.nexscreen.client)
@@ -103,6 +104,18 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
   reinicia la captura sin cortar la conexión.
 - La posición elegida por el usuario se guarda en `%APPDATA%\NexScreen\host-state.json`
   (el usuario tiene la tablet a la izquierda del notebook).
+
+## Input táctil y lápiz (fase 3)
+
+- Se inyecta con `InjectSyntheticPointerInput` (táctil y lápiz reales de Windows, sin driver).
+- **Las coordenadas son relativas al origen del escritorio virtual** (`SM_XVIRTUALSCREEN`,
+  `SM_YVIRTUALSCREEN`), no absolutas. Con la tablet a la izquierda el origen es (-2304, 0): sin
+  restarlo los toques se pierden sin ningún error. Con la tablet a la derecha no se nota.
+- `GetCursorPos` **no sirve para verificar el táctil** (el cursor no siempre sigue al toque); el
+  hover del lápiz sí lo mueve. Para probar toques, abrir una ventana en un punto conocido y
+  verificar que reciba el clic.
+- Las pruebas con `fake_client.py` agregan el monitor virtual aunque la tablet no esté conectada:
+  avisarle al usuario, porque ve aparecer y desaparecer una pantalla.
 
 ## Protocolo
 
