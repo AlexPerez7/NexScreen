@@ -14,6 +14,7 @@ import java.net.Socket
 object Protocol {
     const val VERSION = 1
     const val DEFAULT_PORT = 27190
+    const val DISCOVERY_PORT = 27191
     const val MAX_PAYLOAD = 16 * 1024 * 1024
 
     const val TYPE_HELLO = 0x01

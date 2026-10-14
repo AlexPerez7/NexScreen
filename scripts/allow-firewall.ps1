@@ -1,23 +1,34 @@
 <#
 .SYNOPSIS
-    Abre el puerto del host en el Firewall de Windows para conectarse por WiFi.
+    Abre en el Firewall de Windows los puertos que NexScreen usa por WiFi:
+    TCP 27190 (video e input) y UDP 27191 (descubrimiento: la tablet encuentra el PC).
     Requiere ejecutarse como administrador. Solo hace falta una vez.
 #>
 #Requires -RunAsAdministrator
 param(
-    [int]$Port = 27190
+    [int]$Port = 27190,
+    [int]$DiscoveryPort = 27191
 )
 
 $ErrorActionPreference = 'Stop'
-$name = 'NexScreen'
+$rules = @(
+    @{ Name = 'NexScreen'; Protocol = 'TCP'; Port = $Port; Description = 'Video e input hacia la tablet (NexScreen)' },
+    @{ Name = 'NexScreen (descubrimiento)'; Protocol = 'UDP'; Port = $DiscoveryPort; Description = 'La tablet encuentra el PC en la red (NexScreen)' }
+)
 
-if (Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue) {
-    Remove-NetFirewallRule -DisplayName $name
+foreach ($rule in $rules) {
+    if (Get-NetFirewallRule -DisplayName $rule.Name -ErrorAction SilentlyContinue) {
+        Remove-NetFirewallRule -DisplayName $rule.Name
+    }
+
+    New-NetFirewallRule -DisplayName $rule.Name -Description $rule.Description `
+        -Direction Inbound -Protocol $rule.Protocol -LocalPort $rule.Port -Action Allow `
+        -Profile Domain, Private | Out-Null
+    Write-Host "Regla '$($rule.Name)' creada para $($rule.Protocol) $($rule.Port) (perfiles Dominio y Privado)." -ForegroundColor Green
 }
 
-New-NetFirewallRule -DisplayName $name `
-    -Description 'Streaming de pantalla hacia la tablet (nexscreen-host)' `
-    -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow `
-    -Profile Domain, Private | Out-Null
-
-Write-Host "Regla '$name' creada para TCP $Port (perfiles Dominio y Privado)." -ForegroundColor Green
+$public = Get-NetConnectionProfile | Where-Object NetworkCategory -eq 'Public'
+if ($public) {
+    Write-Host "Atención: la red '$($public.Name -join ', ')' es Pública y estas reglas no aplican ahí." -ForegroundColor Yellow
+    Write-Host 'Márcala como Privada en Configuración > Red e Internet si es tu red de confianza.' -ForegroundColor Yellow
+}

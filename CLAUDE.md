@@ -20,7 +20,7 @@ NexScreen convierte una tablet Android (desarrollado con una Samsung Galaxy Tab 
 | 1 | Espejo de un monitor → tablet | ✅ |
 | 2 | Monitor virtual para extender el escritorio | ✅ |
 | 3 | Táctil y S Pen (presión) hacia Windows | ✅ |
-| 4 | App de bandeja, autoconexión, instalador, releases | En curso (4a bandeja ✅, 4b USB ✅) |
+| 4 | App de bandeja, autoconexión, instalador, releases | En curso (4a bandeja ✅, 4b USB ✅, 4c WiFi ✅) |
 
 Plan de la fase 4: 4a app de bandeja · 4b autoconexión USB · 4c descubrimiento WiFi ·
 4d escala automática · 4e instalador (Inno Setup) · 4f releases con GitHub Actions + APK firmado.
@@ -104,6 +104,13 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 - **Scripts de Python que reescriben archivos**: `Path.write_text` en Windows convierte `\n` en
   CRLF y después Edit no encuentra los textos. Escribir bytes o usar `newline="\n"`.
 - `InternalsVisibleTo` usa el nombre del **ensamblado** (`nexscreen-host`, `NexScreen`), no el del proyecto.
+- **WiFi:** el PC tiene IP 192.168.1.88 en la red "Fenita_5G" (marcada como Privada el 2026-10-14
+  a pedido del usuario) y la tablet 192.168.1.87. Reglas de firewall "NexScreen" (TCP 27190) y
+  "NexScreen (descubrimiento)" (UDP 27191) creadas con `scripts/allow-firewall.ps1`.
+- **Leer el log con PowerShell 5** requiere `Get-Content -Encoding UTF8`; sin eso los acentos salen
+  mal y `Select-String` no encuentra palabras con tilde.
+- Para ver la pantalla de la tablet sin pedirle nada al usuario: `adb shell uiautomator dump` +
+  `adb pull` y leer los `text=` del XML (con `-Encoding UTF8`). `adb shell input tap x y` para tocar.
 - **Los daemons de Gradle y Kotlin bloquean la carpeta del proyecto**: para moverla o renombrarla,
   `gradlew --stop` y matar los `java.exe` que queden.
 - **Reiniciar el servidor adb** (`adb kill-server`) hace que la tablet vuelva a pedir autorización

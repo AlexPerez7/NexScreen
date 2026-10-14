@@ -1,12 +1,18 @@
 <resources>
     <string name="app_name">NexScreen</string>
     <string name="main_subtitle">Usa esta tablet como monitor de tu PC</string>
+    <string name="discovery_title">PCs en la red</string>
+    <string name="discovery_searching">Buscando PCs con NexScreen…</string>
+    <string name="discovery_none">No se encontró ningún PC. Revisa que NexScreen esté abierto en el PC, que ambos estén en la misma red WiFi y que el firewall lo permita.</string>
+    <string name="discovery_rescan">Buscar de nuevo</string>
+    <string name="discovered_host">%1$s · %2$s</string>
+    <string name="manual_title">O ingresa la IP manualmente</string>
     <string name="host_hint">IP del PC (WiFi)</string>
     <string name="port_hint">Puerto</string>
     <string name="show_stats">Mostrar estadísticas (fps, latencia, bitrate)</string>
     <string name="connect_usb">Conectar por USB</string>
     <string name="connect_wifi">Conectar por WiFi</string>
-    <string name="main_help">USB: conecta el cable, ejecuta scripts\\usb-connect.ps1 en el PC y toca \"Conectar por USB\".\nWiFi: usa una de las IPs que muestra nexscreen-host al iniciar.</string>
+    <string name="main_help">USB: con NexScreen abierto en el PC, enchufa la tablet y la conexión arranca sola.\nWiFi: el PC y la tablet tienen que estar en la misma red.</string>
     <string name="error_host_required">Ingresa la IP del PC</string>
     <string name="error_port_invalid">Puerto inválido</string>
     <string name="status_connecting">Conectando a %1$s:%2$d…</string>

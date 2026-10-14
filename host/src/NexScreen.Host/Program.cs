@@ -53,7 +53,11 @@ Console.CancelKeyPress += (_, e) =>
 };
 
 var server = new StreamServer(options);
-var tasks = new List<Task> { server.RunAsync(cts.Token) };
+var tasks = new List<Task>
+{
+    server.RunAsync(cts.Token),
+    new DiscoveryResponder(options.Port, version?.ToString(3) ?? "0.0.0").RunAsync(cts.Token),
+};
 var adbPath = ToolLocator.Find("adb");
 if (options.UsbAutoConnect && ToolLocator.Runs(adbPath, "version"))
 {

@@ -53,6 +53,25 @@ Todas las entradas de dedos de un mensaje forman **un frame**: el host las inyec
 `InjectSyntheticPointerInput`, como exige Windows para el multitáctil. Las del lápiz se inyectan
 una por una. Un `move` de un dedo desconocido se trata como `down`.
 
+## Descubrimiento (UDP 27191)
+
+Para conectarse por WiFi sin escribir la IP, la tablet envía por UDP un broadcast al puerto
+**27191** (a `255.255.255.255` y al broadcast de su subred, tres veces en ~2 s) con el texto ASCII:
+
+```
+NEXSCREEN_DISCOVER 1
+```
+
+Cada host responde por unicast al origen con un JSON:
+
+```json
+{"protocol":1,"name":"ALEXP-ASSERTIVA","port":27190,"version":"0.4.0"}
+```
+
+La tablet descarta respuestas con otra versión de protocolo y muestra los hosts encontrados.
+En Windows hacen falta reglas de firewall para TCP 27190 y UDP 27191 (`scripts/allow-firewall.ps1`),
+y la red tiene que estar marcada como Privada.
+
 ## Secuencia
 
 1. La tablet conecta y envía **HELLO** con la resolución física de la pantalla.

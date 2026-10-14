@@ -15,6 +15,9 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
 {
     private static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(5);
 
+    private static readonly string AppVersion =
+        typeof(TrayContext).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+
     private readonly SynchronizationContext _ui = new WindowsFormsSynchronizationContext();
     private readonly AppSettings _settings = AppSettings.Load();
     private readonly TrayIcons _icons = new();
@@ -151,12 +154,16 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         SetState(TrayState.Waiting, "Esperando la tablet");
 
         var server = new StreamServer(options, this);
+        var discovery = new DiscoveryResponder(options.Port, AppVersion);
         _server = server;
         _serverTask = Task.Run(async () =>
         {
             try
             {
-                await server.RunAsync(cts.Token);
+                await Task.WhenAll(server.RunAsync(cts.Token), discovery.RunAsync(cts.Token));
+            }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            {
             }
             catch (Exception ex) when (!cts.IsCancellationRequested)
             {

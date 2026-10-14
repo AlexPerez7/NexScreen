@@ -11,6 +11,9 @@ internal static class Wire
     public const int Version = 1;
     public const int DefaultPort = 27190;
 
+    /// <summary>UDP: la tablet busca hosts en la red con un broadcast a este puerto.</summary>
+    public const int DiscoveryPort = 27191;
+
     /// <summary>[u8 tipo][u32 largo big-endian]</summary>
     public const int HeaderSize = 5;
 
