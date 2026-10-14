@@ -4,12 +4,20 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.InputFilter
+import android.text.InputType
+import android.view.Gravity
 import android.view.SurfaceHolder
 import android.view.View
 import android.view.WindowManager
+import android.view.inputmethod.EditorInfo
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.widget.doAfterTextChanged
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -17,9 +25,12 @@ import androidx.core.view.isVisible
 import dev.nexscreen.client.databinding.ActivityStreamBinding
 import dev.nexscreen.client.input.PointerForwarder
 import dev.nexscreen.client.net.DisplayInfo
+import dev.nexscreen.client.net.Pairing
+import dev.nexscreen.client.net.PairingFailedException
 import dev.nexscreen.client.net.Protocol
 import dev.nexscreen.client.net.StreamClient
 import dev.nexscreen.client.net.StreamStats
+import dev.nexscreen.client.net.TrustedHosts
 import java.util.Locale
 
 /**
@@ -34,6 +45,8 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
     private var videoHeight = 0
     private var reconnectAttempts = 0
     private val handler = Handler(Looper.getMainLooper())
+    private val trustedHosts by lazy { TrustedHosts(this) }
+    private var pairingDialog: AlertDialog? = null
 
     private val host by lazy { intent.getStringExtra(EXTRA_HOST) ?: "127.0.0.1" }
     private val port by lazy { intent.getIntExtra(EXTRA_PORT, Protocol.DEFAULT_PORT) }
@@ -76,7 +89,7 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
     private fun startClient() {
         val holder = binding.surface.holder
         if (!holder.surface.isValid) return
-        val client = StreamClient(host, port, holder.surface, displayInfo(), this).also { it.start() }
+        val client = StreamClient(host, port, holder.surface, displayInfo(), trustedHosts, this).also { it.start() }
         this.client = client
         // Los toques sobre el video se reenvían al PC como táctil y lápiz de Windows.
         val forwarder = PointerForwarder(client::sendPointer)
@@ -88,6 +101,7 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         handler.removeCallbacksAndMessages(null)
+        dismissPairingDialog()
         binding.surface.setOnTouchListener(null)
         binding.surface.setOnGenericMotionListener(null)
         client?.stop()
@@ -131,6 +145,77 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
         binding.status.isVisible = true
     }
 
+    /** El PC no conoce esta tablet (o la tablet no conoce el PC): pedir el PIN que muestra el PC. */
+    override fun onPairingRequired(hostName: String, error: String?) = runOnUiThread {
+        if (isFinishing || isDestroyed) return@runOnUiThread
+        dismissPairingDialog()
+        // Mientras el usuario escribe el PIN no hay que contar esto como reconexión fallida.
+        reconnectAttempts = 0
+        binding.status.text = getString(R.string.pairing_status, hostName)
+        binding.status.isVisible = true
+
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            filters = arrayOf(InputFilter.LengthFilter(Pairing.PIN_LENGTH))
+            gravity = Gravity.CENTER
+            textSize = 32f
+            letterSpacing = 0.3f
+            hint = "000000"
+            imeOptions = EditorInfo.IME_ACTION_DONE
+        }
+        val padding = (24 * resources.displayMetrics.density).toInt()
+        val container = FrameLayout(this).apply {
+            setPadding(padding, padding / 2, padding, 0)
+            addView(input)
+        }
+
+        val message = buildString {
+            append(getString(R.string.pairing_message, hostName))
+            if (error != null) append("\n\n").append(error)
+        }
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.pairing_title)
+            .setMessage(message)
+            .setView(container)
+            .setCancelable(false)
+            .setPositiveButton(R.string.pairing_submit, null)
+            .setNegativeButton(R.string.pairing_cancel) { _, _ -> finish() }
+            .create()
+
+        fun submit() {
+            val pin = input.text?.toString().orEmpty()
+            if (pin.length != Pairing.PIN_LENGTH) return
+            client?.submitPin(pin)
+            binding.status.text = getString(R.string.pairing_checking)
+            dismissPairingDialog()
+        }
+
+        dialog.setOnShowListener {
+            val ok = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            ok.isEnabled = false
+            ok.setOnClickListener { submit() }
+            input.doAfterTextChanged { ok.isEnabled = it?.length == Pairing.PIN_LENGTH }
+            input.setOnEditorActionListener { _, actionId, _ ->
+                (actionId == EditorInfo.IME_ACTION_DONE).also { if (it) submit() }
+            }
+            input.requestFocus()
+        }
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        dialog.show()
+        pairingDialog = dialog
+    }
+
+    override fun onPaired(hostName: String) = runOnUiThread {
+        dismissPairingDialog()
+        Toast.makeText(this, getString(R.string.pairing_done, hostName), Toast.LENGTH_SHORT).show()
+        binding.status.text = getString(R.string.status_waiting_video)
+    }
+
+    private fun dismissPairingDialog() {
+        pairingDialog?.dismiss()
+        pairingDialog = null
+    }
+
     override fun onConnected() = runOnUiThread {
         reconnectAttempts = 0
         binding.status.text = getString(R.string.status_waiting_video)
@@ -159,11 +244,15 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
      */
     override fun onDisconnected(error: Throwable?) = runOnUiThread {
         client = null
+        dismissPairingDialog()
         if (isFinishing || isDestroyed) return@runOnUiThread
 
-        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        // Si el emparejamiento falló (PIN incorrecto, cancelado o vencido) reconectar solo
+        // volvería a pedir el PIN: mejor volver a la pantalla inicial y explicar por qué.
+        if (error is PairingFailedException || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
             val reason = error?.message ?: error?.javaClass?.simpleName ?: getString(R.string.reason_host_closed)
-            Toast.makeText(this, getString(R.string.disconnected, reason), Toast.LENGTH_LONG).show()
+            val text = if (error is PairingFailedException) R.string.pairing_failed else R.string.disconnected
+            Toast.makeText(this, getString(text, reason), Toast.LENGTH_LONG).show()
             finish()
             return@runOnUiThread
         }

@@ -24,7 +24,7 @@ public class DiscoveryTests
     {
         var json = Encoding.UTF8.GetString(DiscoveryResponder.BuildReply("ALEX-LAPTOP", 27190, "0.4.0"));
 
-        Assert.Equal("""{"protocol":1,"name":"ALEX-LAPTOP","port":27190,"version":"0.4.0"}""", json);
+        Assert.Equal("""{"protocol":2,"name":"ALEX-LAPTOP","port":27190,"version":"0.4.0"}""", json);
     }
 
     [Fact]

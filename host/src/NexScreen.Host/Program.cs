@@ -4,6 +4,7 @@ using NexScreen.Core;
 using NexScreen.Core.Display;
 using NexScreen.Core.Net;
 using NexScreen.Core.Protocol;
+using NexScreen.Core.Security;
 using NexScreen.Core.Usb;
 
 Console.OutputEncoding = Encoding.UTF8;
@@ -52,7 +53,7 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-var server = new StreamServer(options);
+var server = new StreamServer(options, new ConsoleStreamObserver());
 var tasks = new List<Task>
 {
     server.RunAsync(cts.Token),
@@ -116,6 +117,33 @@ file sealed class LogUsbObserver : IUsbObserver
     }
 
     public void OnUsbError(string message)
+    {
+    }
+}
+
+/// <summary>En la consola solo hace falta mostrar el PIN de emparejamiento (no va al log).</summary>
+file sealed class ConsoleStreamObserver : IStreamObserver
+{
+    public void OnClientConnected(string device, int width, int height)
+    {
+    }
+
+    public void OnStats(double fps, double mbps)
+    {
+    }
+
+    public void OnClientDisconnected(string? reason)
+    {
+    }
+
+    public void OnPairingStarted(string device, string pin, CancellationTokenSource cancel)
+    {
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.WriteLine($">>> Código para emparejar {device}: {Pairing.Format(pin)}");
+        Console.ResetColor();
+    }
+
+    public void OnPairingFinished(string device, bool paired)
     {
     }
 }

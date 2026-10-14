@@ -36,4 +36,4 @@ jobs:
 
       - name: Compilar (debug)
         working-directory: android
-        run: ./gradlew assembleDebug --console=plain
+        run: ./gradlew assembleDebug testDebugUnitTest --console=plain

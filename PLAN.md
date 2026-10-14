@@ -7,7 +7,15 @@ Esfuerzo estimado: **S** (horas), **M** (un par de días), **L** (una semana o m
 
 ## Prioridad alta
 
-### 1. Seguridad de la conexión por WiFi — M
+### 1. Seguridad de la conexión por WiFi — ✅ hecho
+
+TLS + emparejamiento por PIN, protocolo v2 (ver CLAUDE.md, "Seguridad por WiFi", y
+docs/protocol.md). Queda abierto: un PAKE (SPAKE2) para que ni siquiera un man-in-the-middle
+activo durante el emparejamiento pueda probar los PINs fuera de línea.
+
+<details><summary>Notas originales</summary>
+
+### Seguridad de la conexión por WiFi — M
 
 **Qué:** hoy cualquier dispositivo de la red puede conectarse al puerto 27190, ver la pantalla e
 inyectar toques. Agregar emparejamiento y cifrado.
@@ -19,6 +27,8 @@ inyectar toques. Agregar emparejamiento y cifrado.
   autofirmado fijado tras el emparejamiento.
 - Por USB (`adb reverse`, 127.0.0.1) se puede omitir: el cable ya implica confianza.
 - Requiere protocolo v2 (`Wire.Version` = 2): actualizar los cuatro lugares (ver CLAUDE.md).
+
+</details>
 
 ### 2. Pedido de keyframe y bitrate adaptativo — M
 

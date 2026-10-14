@@ -20,4 +20,12 @@
     <string name="disconnected">Desconectado: %1$s</string>
     <string name="status_reconnecting">Reconectando…</string>
     <string name="reason_host_closed">el PC cerró la conexión</string>
+    <string name="pairing_title">Emparejar con el PC</string>
+    <string name="pairing_message">Para conectarte por WiFi a %1$s, ingresa el código de 6 dígitos que muestra NexScreen en la pantalla del PC.</string>
+    <string name="pairing_submit">Emparejar</string>
+    <string name="pairing_cancel">Cancelar</string>
+    <string name="pairing_status">Emparejando con %1$s…</string>
+    <string name="pairing_checking">Verificando el código…</string>
+    <string name="pairing_done">Emparejada con %1$s</string>
+    <string name="pairing_failed">No se pudo emparejar: %1$s</string>
 </resources>

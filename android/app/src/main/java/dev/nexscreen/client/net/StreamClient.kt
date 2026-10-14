@@ -14,24 +14,39 @@ import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicInteger
+import javax.net.ssl.SSLSocket
 
 data class DisplayInfo(val width: Int, val height: Int, val dpi: Int)
 
 data class StreamStats(val fps: Float, val mbps: Float, val rttMs: Float?)
 
+/** El emparejamiento falló sin posibilidad de reintentar (no tiene sentido reconectar sola). */
+class PairingFailedException(message: String) : Exception(message)
+
 /**
  * Conexión con el host: handshake, recepción de video y ping de latencia.
  * Corre en su propio hilo; los callbacks del [Listener] llegan desde hilos de fondo.
+ *
+ * Por USB (127.0.0.1, `adb reverse`) va sin cifrar. Por WiFi va con TLS y solo se acepta video
+ * (y se manda input) si el PC está en [TrustedHosts] o el usuario acaba de emparejarlo con el PIN.
  */
 class StreamClient(
     private val host: String,
     private val port: Int,
     private val surface: Surface,
     private val display: DisplayInfo,
+    private val trustedHosts: TrustedHosts,
     private val listener: Listener,
 ) {
     interface Listener {
         fun onConnecting()
+
+        /**
+         * El PC pide el PIN. Responder con [submitPin] (o [stop] para cancelar).
+         * [error]: por qué falló el intento anterior, o null si es el primero.
+         */
+        fun onPairingRequired(hostName: String, error: String?)
+        fun onPaired(hostName: String)
         fun onConnected()
         fun onVideoSize(width: Int, height: Int)
         fun onStats(stats: StreamStats)
@@ -48,6 +63,13 @@ class StreamClient(
 
     @Volatile
     private var channel: MessageChannel? = null
+
+    /** Canal durante el emparejamiento (antes de que [channel] habilite el input). */
+    @Volatile
+    private var pairingChannel: MessageChannel? = null
+
+    @Volatile
+    private var hostFingerprint: String? = null
     private var thread: Thread? = null
 
     // Android no permite escribir en la red desde el hilo de UI, que es donde llegan los toques.
@@ -86,23 +108,54 @@ class StreamClient(
         }
     }
 
+    /** Envía el PIN que ingresó el usuario (ver [Listener.onPairingRequired]). */
+    fun submitPin(pin: String) {
+        val channel = pairingChannel ?: return
+        val hostFingerprint = hostFingerprint ?: return
+        try {
+            inputExecutor.execute {
+                try {
+                    // El Keystore puede tardar: fuera del hilo de UI.
+                    val clientFingerprint = Pairing.fingerprint(TlsIdentity.certificate.encoded)
+                    val proof = Pairing.proof(pin, hostFingerprint, clientFingerprint)
+                    channel.write(Protocol.TYPE_PAIR, JSONObject().put("proof", proof).toString().toByteArray(Charsets.UTF_8))
+                } catch (e: IOException) {
+                    // El hilo de red detecta la desconexión y la informa.
+                }
+            }
+        } catch (e: RejectedExecutionException) {
+            // Cliente detenido.
+        }
+    }
+
     private fun run() {
         var decoder: VideoDecoder? = null
         var error: Throwable? = null
         try {
             listener.onConnecting()
             // connect() fuera de apply{}: adentro, `port` resolvería a Socket.getPort() (0).
-            val socket = Socket().apply {
+            val tcp = Socket().apply {
                 tcpNoDelay = true
                 receiveBufferSize = 1 shl 20
             }
+            this.socket = tcp
+            tcp.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
+            if (!running) return
+
+            val usb = host == USB_HOST
+            var trusted = usb
+            var hostName = host
+            val socket = if (usb) tcp else secure(tcp)
             this.socket = socket
-            socket.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
+            if (socket is SSLSocket) {
+                val fingerprint = Pairing.fingerprint(socket.session.peerCertificates[0].encoded)
+                hostFingerprint = fingerprint
+                trusted = trustedHosts.contains(fingerprint)
+            }
             if (!running) return
 
             val channel = MessageChannel(socket)
-            channel.write(Protocol.TYPE_HELLO, helloPayload())
-            this.channel = channel
+            channel.write(Protocol.TYPE_HELLO, helloPayload(paired = trusted && !usb))
 
             var lastPing = 0L
             var lastStats = SystemClock.elapsedRealtime()
@@ -112,9 +165,35 @@ class StreamClient(
             while (running) {
                 val message = channel.read()
                 when (message.type) {
+                    Protocol.TYPE_PAIR_REQUIRED -> {
+                        if (usb) throw IOException("El PC pidió emparejar por USB")
+                        hostName = JSONObject(String(message.payload, Charsets.UTF_8)).optString("host", host)
+                        trusted = false
+                        pairingChannel = channel
+                        listener.onPairingRequired(hostName, null)
+                    }
+                    Protocol.TYPE_PAIR_RESULT -> {
+                        val result = JSONObject(String(message.payload, Charsets.UTF_8))
+                        val error = result.optString("error").ifEmpty { null }
+                        val fingerprint = hostFingerprint
+                        when {
+                            result.optBoolean("ok") && fingerprint != null && pairingChannel != null -> {
+                                trustedHosts.add(fingerprint, hostName)
+                                trusted = true
+                                pairingChannel = null
+                                listener.onPaired(hostName)
+                            }
+                            result.optBoolean("retry") && pairingChannel != null -> listener.onPairingRequired(hostName, error)
+                            else -> throw PairingFailedException(error ?: "El PC rechazó el emparejamiento")
+                        }
+                    }
                     Protocol.TYPE_CONFIG -> {
+                        // Sin esto, un equipo que se hiciera pasar por el PC podría saltarse el PIN.
+                        if (!trusted) throw PairingFailedException("El PC no completó el emparejamiento")
                         val config = JSONObject(String(message.payload, Charsets.UTF_8))
                         checkConfig(config)
+                        // Recién ahora el input puede ir al PC.
+                        this.channel = channel
                         videoWidth = config.getInt("maxWidth")
                         videoHeight = config.getInt("maxHeight")
                         decoder?.release()
@@ -157,7 +236,7 @@ class StreamClient(
                 }
 
                 val now = SystemClock.elapsedRealtime()
-                if (now - lastPing >= PING_INTERVAL_MS) {
+                if (trusted && now - lastPing >= PING_INTERVAL_MS) {
                     channel.write(Protocol.TYPE_PING, ByteBuffer.allocate(8).putLong(nowUs()).array())
                     lastPing = now
                 }
@@ -181,6 +260,7 @@ class StreamClient(
             }
         } finally {
             channel = null
+            pairingChannel = null
             decoder?.release()
             socket?.close()
             if (running) listener.onDisconnected(error)
@@ -194,8 +274,18 @@ class StreamClient(
         }
     }
 
-    private fun helloPayload(): ByteArray = JSONObject()
+    /** Handshake TLS (con timeout: un puerto que no habla TLS no debe colgar la conexión). */
+    private fun secure(tcp: Socket): SSLSocket {
+        val ssl = TlsIdentity.socketFactory().createSocket(tcp, host, port, true) as SSLSocket
+        ssl.soTimeout = TLS_TIMEOUT_MS
+        ssl.startHandshake()
+        ssl.soTimeout = 0
+        return ssl
+    }
+
+    private fun helloPayload(paired: Boolean): ByteArray = JSONObject()
         .put("protocol", Protocol.VERSION)
+        .put("paired", paired)
         .put("device", "${Build.MANUFACTURER} ${Build.MODEL}")
         .put("width", display.width)
         .put("height", display.height)
@@ -216,7 +306,9 @@ class StreamClient(
 
     private companion object {
         const val TAG = "StreamClient"
+        const val USB_HOST = "127.0.0.1"
         const val CONNECT_TIMEOUT_MS = 3000
+        const val TLS_TIMEOUT_MS = 5000
         const val PING_INTERVAL_MS = 1000L
         const val STATS_INTERVAL_MS = 1000L
     }

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using NexScreen.Core;
 using NexScreen.Core.Display;
 using NexScreen.Core.Net;
+using NexScreen.Core.Security;
 using NexScreen.Core.Update;
 using NexScreen.Core.Usb;
 
@@ -30,6 +31,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
 
     private readonly SynchronizationContext _ui = new WindowsFormsSynchronizationContext();
     private readonly AppSettings _settings = AppSettings.Load();
+    private readonly PairedDevices _paired = new();
     private readonly TrayIcons _icons = new();
     private readonly NotifyIcon _notifyIcon;
     private readonly ToolStripMenuItem _status = new() { Enabled = false };
@@ -53,6 +55,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
     private UpdateRelease? _availableUpdate;
     private bool _updating;
     private Action? _balloonClick;
+    private PairingForm? _pairingForm;
 
     public TrayContext()
     {
@@ -84,6 +87,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         menu.Items.Add(ScaleMenu());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Abrir NexScreen en la tablet (USB)", null, async (_, _) => await ConnectUsbNowAsync()));
+        menu.Items.Add(PairedDevicesMenu());
         menu.Items.Add(_startWithWindows);
         menu.Items.Add(new ToolStripMenuItem("Abrir el registro", null, (_, _) => OpenLog()));
         menu.Items.Add(new ToolStripMenuItem($"Buscar actualizaciones (versión {AppVersion})", null, async (_, _) => await CheckForUpdateAsync(manual: true)));
@@ -170,6 +174,37 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         return menu;
     }
 
+    /// <summary>Tablets emparejadas por WiFi; elegir una la olvida (tendrá que volver a ingresar el PIN).</summary>
+    private ToolStripMenuItem PairedDevicesMenu()
+    {
+        var menu = new ToolStripMenuItem("Tablets emparejadas (WiFi)");
+        menu.DropDownItems.Add(new ToolStripMenuItem("Ninguna") { Enabled = false });
+        menu.DropDownOpening += (_, _) =>
+        {
+            menu.DropDownItems.Clear();
+            var devices = _paired.All;
+            if (devices.Count == 0)
+            {
+                menu.DropDownItems.Add(new ToolStripMenuItem("Ninguna") { Enabled = false });
+                return;
+            }
+
+            foreach (var device in devices.OrderBy(d => d.Name))
+            {
+                var item = new ToolStripMenuItem($"Olvidar {device.Name} (emparejada el {device.PairedAt:dd-MM-yyyy})");
+                item.Click += (_, _) =>
+                {
+                    _paired.Remove(device.Fingerprint);
+                    Log.Info($"Se olvidó la tablet {device.Name}");
+                    ShowBalloon(5_000, "Tablet olvidada",
+                        $"{device.Name} tendrá que volver a ingresar el código para conectarse por WiFi.", ToolTipIcon.Info);
+                };
+                menu.DropDownItems.Add(item);
+            }
+        };
+        return menu;
+    }
+
     private void ToggleStartWithWindows()
     {
         StartupRegistration.Set(!StartupRegistration.IsEnabled);
@@ -202,7 +237,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         _serverCts = cts;
         SetState(TrayState.Waiting, "Esperando la tablet");
 
-        var server = new StreamServer(options, this);
+        var server = new StreamServer(options, this, _paired);
         var discovery = new DiscoveryResponder(options.Port, AppVersion);
         _server = server;
         _serverTask = Task.Run(async () =>
@@ -494,6 +529,24 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         if (reason is not null && device is not null)
         {
             ShowBalloon(5_000, "Tablet desconectada", reason, ToolTipIcon.Warning);
+        }
+    }, null);
+
+    void IStreamObserver.OnPairingStarted(string device, string pin, CancellationTokenSource cancel) => _ui.Post(_ =>
+    {
+        if (_exiting) return;
+        _pairingForm?.CloseQuietly();
+        _pairingForm = new PairingForm(device, pin, cancel);
+        _pairingForm.Show();
+    }, null);
+
+    void IStreamObserver.OnPairingFinished(string device, bool paired) => _ui.Post(_ =>
+    {
+        _pairingForm?.CloseQuietly();
+        _pairingForm = null;
+        if (paired)
+        {
+            ShowBalloon(5_000, "Tablet emparejada", $"{device} ya puede conectarse por WiFi sin código.", ToolTipIcon.Info);
         }
     }, null);
 

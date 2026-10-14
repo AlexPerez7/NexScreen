@@ -21,6 +21,7 @@ NexScreen convierte una tablet Android (desarrollado con una Samsung Galaxy Tab 
 | 2 | Monitor virtual para extender el escritorio | ✅ |
 | 3 | Táctil y S Pen (presión) hacia Windows | ✅ |
 | 4 | App de bandeja, autoconexión, instalador, releases | ✅ |
+| 5 | Actualización automática, TLS y emparejamiento por WiFi (protocolo v2) | ✅ |
 
 Ideas para próximas versiones, priorizadas y con notas técnicas: `PLAN.md`.
 
@@ -34,6 +35,7 @@ host/src/NexScreen.Core/      Lógica del host (librería, net8.0-windows)
   Net/                        StreamServer, ClientSession, IStreamObserver (eventos para la UI)
   Display/                    Monitor virtual: API CCD, GDI, DXGI, driver VDD
   Input/                      Táctil y lápiz: mensaje POINTER, traductor de frames, inyección Win32
+  Security/                   WiFi: certificado del host, PIN de emparejamiento, tablets emparejadas
   Update/                     Actualización automática: GitHub Releases, descarga y verificación
   HostStartup.cs              Preparación común (ffmpeg, modo, limpieza del monitor virtual)
   ToolLocator.cs              ffmpeg/adb en tools\ junto al exe (instalador) o en el PATH
@@ -181,6 +183,27 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 - `versionCode` del APK = mayor×10000 + menor×100 + parche. El host compara el del APK incluido
   (`tools\NexScreen.apk.json`, lo escribe build.ps1 con aapt2) con el de la tablet y actualiza la app.
 - ffmpeg se descarga primero de la copia propia (release `build-deps`, pre-release) y si no, de BtbN.
+
+## Seguridad por WiFi (protocolo v2)
+
+- Por WiFi todo va por **TLS** y la tablet tiene que estar **emparejada** con un PIN de 6 dígitos
+  que muestra la bandeja (`PairingForm`). Por USB (conexión desde 127.0.0.1) va sin cifrar y sin
+  PIN. Detalle del protocolo y del cálculo del PIN en `docs/protocol.md`.
+- Host: `Security/HostIdentity.cs` (certificado en `CurrentUser\My`, nombre "NexScreen host"; se
+  crea solo), `Security/Pairing.cs`, `Security/PairedDevices.cs`
+  (`%APPDATA%\NexScreen\paired-devices.json`), `Net/Handshake.cs`. En la bandeja, "Tablets
+  emparejadas (WiFi)" permite olvidar una.
+- Tablet: `net/TlsIdentity.kt` (clave en el Android Keystore), `net/Pairing.kt` (`TrustedHosts`
+  en SharedPreferences `trusted_hosts`). Reinstalar la app (o que el host la reinstale por cambio
+  de firma) borra su identidad: hay que volver a emparejar.
+- **El handshake corre antes de tocar la sesión activa** (`StreamServer.HandleClientAsync`):
+  una conexión no emparejada no puede cortar la de la tablet. Máximo 4 handshakes a la vez.
+- Probar sin tablet: `fake_client.py --host 192.168.1.88` usa TLS con una identidad propia
+  (`--identity`, requiere `cryptography`) y pide el PIN, que la consola `nexscreen-host` imprime
+  (no va al log). **Ojo:** la consola guarda la emparejada en el mismo `paired-devices.json` que la
+  bandeja; borrarla después de probar. `Tee-Object` de PowerShell 5 escribe el archivo en UTF-16.
+- `HostIdentity` no usa `X509CertificateLoader` (es de .NET 9) y reimporta el certificado como
+  PFX persistente: **Schannel no puede usar claves efímeras** (también en los tests).
 
 ## Actualización automática
 

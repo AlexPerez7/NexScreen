@@ -12,13 +12,16 @@ import java.net.Socket
  * también en el host (Wire.cs).
  */
 object Protocol {
-    const val VERSION = 1
+    const val VERSION = 2
     const val DEFAULT_PORT = 27190
     const val DISCOVERY_PORT = 27191
     const val MAX_PAYLOAD = 16 * 1024 * 1024
 
     const val TYPE_HELLO = 0x01
     const val TYPE_CONFIG = 0x02
+    const val TYPE_PAIR_REQUIRED = 0x03
+    const val TYPE_PAIR = 0x04
+    const val TYPE_PAIR_RESULT = 0x05
     const val TYPE_VIDEO = 0x10
     const val TYPE_POINTER = 0x20
     const val TYPE_PING = 0x30

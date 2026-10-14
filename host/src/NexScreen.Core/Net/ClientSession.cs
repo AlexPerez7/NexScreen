@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Net.Sockets;
-using System.Text.Json;
 using NexScreen.Core.Display;
 using NexScreen.Core.Input;
 using NexScreen.Core.Protocol;
@@ -11,7 +9,6 @@ namespace NexScreen.Core.Net;
 /// <summary>Una conexión con un cliente: handshake, streaming de video y keep-alive.</summary>
 internal sealed class ClientSession
 {
-    private static readonly TimeSpan HelloTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan FirstFrameTimeout = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan StatsInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan RestartDelay = TimeSpan.FromMilliseconds(500);
@@ -31,10 +28,9 @@ internal sealed class ClientSession
         _observer = observer;
     }
 
-    public async Task RunAsync(TcpClient client, CancellationToken ct)
+    /// <summary>Corre la sesión sobre un canal que ya pasó el <see cref="Handshake"/>.</summary>
+    public async Task RunAsync(MessageChannel channel, HelloMessage hello, CancellationToken ct)
     {
-        await using var channel = new MessageChannel(client.GetStream());
-        var hello = await ReadHelloAsync(channel, ct).ConfigureAwait(false);
         Log.Info($"Cliente: {hello.Device} {hello.Width}x{hello.Height} @ {hello.Dpi} dpi");
 
         // La tablet se usa apaisada: el lado largo es el ancho.
@@ -115,26 +111,6 @@ internal sealed class ClientSession
         }
 
         await finished.ConfigureAwait(false);
-    }
-
-    private static async Task<HelloMessage> ReadHelloAsync(MessageChannel channel, CancellationToken ct)
-    {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(HelloTimeout);
-
-        var message = await channel.ReadAsync(timeout.Token).ConfigureAwait(false)
-            ?? throw new IOException("El cliente cerró la conexión antes del Hello");
-        if (message.Type != MessageType.Hello) throw new InvalidDataException($"Se esperaba Hello y llegó {message.Type}");
-
-        var hello = JsonSerializer.Deserialize<HelloMessage>(message.Payload, Wire.Json)
-            ?? throw new InvalidDataException("Hello vacío");
-        if (hello.Protocol != Wire.Version)
-        {
-            throw new InvalidDataException($"Versión de protocolo incompatible: cliente {hello.Protocol}, host {Wire.Version}");
-        }
-        if (hello.Width <= 0 || hello.Height <= 0) throw new InvalidDataException("Resolución de cliente inválida");
-
-        return hello;
     }
 
     /// <summary>
