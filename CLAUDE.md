@@ -20,7 +20,7 @@ NexScreen convierte una tablet Android (desarrollado con una Samsung Galaxy Tab 
 | 1 | Espejo de un monitor → tablet | ✅ |
 | 2 | Monitor virtual para extender el escritorio | ✅ |
 | 3 | Táctil y S Pen (presión) hacia Windows | ✅ |
-| 4 | App de bandeja, autoconexión, instalador, releases | En curso (4a-4e ✅; falta 4f releases) |
+| 4 | App de bandeja, autoconexión, instalador, releases | ✅ |
 
 Plan de la fase 4: 4a app de bandeja · 4b autoconexión USB · 4c descubrimiento WiFi ·
 4d escala automática · 4e instalador (Inno Setup) · 4f releases con GitHub Actions + APK firmado.
@@ -166,6 +166,21 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
   Desinstalar quita también las reglas del firewall y el monitor virtual.
 - **En el PC del usuario ya está instalada la versión 0.4.0**: para probar cambios del código hay
   que cerrar el NexScreen instalado (usa el mismo puerto).
+
+## Releases (fase 4f)
+
+- **Publicar:** `git tag vX.Y.Z` + `git push origin vX.Y.Z`. El workflow `.github/workflows/release.yml`
+  corre los tests, firma el APK, arma el instalador con esa versión y crea el release con
+  `NexScreen-Setup-X.Y.Z.exe` y `NexScreen-X.Y.Z.apk`. CI (`ci.yml`) compila y prueba cada push.
+- **Clave de firma del APK:** `C:\Users\AlexPerez\.nexscreen\nexscreen-release.jks` (datos en
+  `signing.json` de esa carpeta). Copia en los secretos del repo (`NEXSCREEN_KEYSTORE_BASE64`,
+  `NEXSCREEN_KEYSTORE_PASSWORD`, `NEXSCREEN_KEY_ALIAS`). **Si se pierde, las tablets no pueden
+  actualizar la app**: hay que desinstalarla (el host lo hace solo si detecta otra firma).
+- Para firmar en el PC: cargar `signing.json` en las variables `NEXSCREEN_KEYSTORE`,
+  `NEXSCREEN_KEYSTORE_PASSWORD` y `NEXSCREEN_KEY_ALIAS` y correr `gradlew assembleRelease`.
+- `versionCode` del APK = mayor×10000 + menor×100 + parche. El host compara el del APK incluido
+  (`tools\NexScreen.apk.json`, lo escribe build.ps1 con aapt2) con el de la tablet y actualiza la app.
+- ffmpeg se descarga primero de la copia propia (release `build-deps`, pre-release) y si no, de BtbN.
 
 ## Protocolo
 

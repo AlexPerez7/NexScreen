@@ -33,7 +33,7 @@ la posición de la tablet, la calidad y la escala.
 | 1 | Espejo de un monitor existente → tablet (USB y WiFi) | ✅ |
 | 2 | Monitor virtual (driver IddCx) para **extender** el escritorio | ✅ |
 | 3 | Input táctil y S Pen (presión) hacia Windows | ✅ |
-| 4 | App de bandeja, autoconexión USB, descubrimiento WiFi, escala, instalador | ✅ (releases automáticos en curso) |
+| 4 | App de bandeja, autoconexión USB, descubrimiento WiFi, escala, instalador, releases | ✅ |
 
 ## Cómo funciona
 
@@ -92,6 +92,17 @@ scripts\allow-firewall.ps1
 # Instalador -> dist\NexScreen-Setup-<versión>.exe
 installer\build.ps1
 ```
+
+### Publicar una versión
+
+```powershell
+git tag v0.5.0
+git push origin v0.5.0
+```
+
+GitHub Actions corre los tests, firma el APK, arma el instalador y publica el release con
+`NexScreen-Setup-0.5.0.exe` y `NexScreen-0.5.0.apk`. Al enchufar la tablet a un PC con la versión
+nueva, NexScreen actualiza la app de la tablet solo.
 
 Para probar el host sin la tablet: `python host\tools\fake_client.py --seconds 5` simula la tablet
 y guarda el video recibido (`ffprobe capture.h264`). `nexscreen-host --list-displays` muestra las

@@ -62,7 +62,7 @@ var adbPath = ToolLocator.Find("adb");
 if (options.UsbAutoConnect && ToolLocator.Runs(adbPath, "version"))
 {
     var usb = new UsbAutoConnector(
-        new AdbClient(adbPath), options.Port, () => server.HasActiveSession, new LogUsbObserver(), ToolLocator.BundledApk());
+        new AdbClient(adbPath), options.Port, () => server.HasActiveSession, new LogUsbObserver(), ToolLocator.BundledApk(), ToolLocator.BundledApkVersionCode());
     tasks.Add(usb.RunAsync(cts.Token));
 }
 

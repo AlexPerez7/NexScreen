@@ -216,7 +216,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         }
 
         var usb = new UsbAutoConnector(
-            new AdbClient(adbPath), port, () => _server?.HasActiveSession ?? false, this, ToolLocator.BundledApk());
+            new AdbClient(adbPath), port, () => _server?.HasActiveSession ?? false, this, ToolLocator.BundledApk(), ToolLocator.BundledApkVersionCode());
         _usb = usb;
         _usbTask = Task.Run(async () =>
         {

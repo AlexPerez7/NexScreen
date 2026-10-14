@@ -29,6 +29,8 @@ Set-Location $root
 # Dependencias con versión y hash fijos. Para actualizar una: cambiar URL y SHA-256 juntos.
 $Pins = @{
     ffmpeg = @{
+        # Copia propia (release build-deps): los autobuilds de BtbN se borran con el tiempo.
+        Mirror = 'https://github.com/AlexPerez7/NexScreen/releases/download/build-deps/ffmpeg-n9.0.2-27-g7e93014c5b-win64-lgpl-shared-9.0.zip'
         Url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-14-13-03/ffmpeg-n9.0.2-27-g7e93014c5b-win64-lgpl-shared-9.0.zip'
         Sha256 = '75943DD3BB603E49FFE01360AC683E2F17D13C0C4193D68CBD1D11448FA32891'
     }
@@ -53,13 +55,21 @@ function Get-Pinned([string]$name) {
     $cache = Join-Path $PSScriptRoot '.cache'
     New-Item -ItemType Directory -Force $cache | Out-Null
     $file = Join-Path $cache "$name.zip"
-    if (-not (Test-Path $file) -or (Get-FileHash $file -Algorithm SHA256).Hash -ne $pin.Sha256) {
-        Write-Host "Descargando $name..."
-        Invoke-WebRequest $pin.Url -OutFile $file -UseBasicParsing
+    if ((Test-Path $file) -and (Get-FileHash $file -Algorithm SHA256).Hash -eq $pin.Sha256) { return $file }
+
+    foreach ($url in @($pin.Mirror, $pin.Url) | Where-Object { $_ }) {
+        Write-Host "Descargando $name desde $url"
+        try {
+            Invoke-WebRequest $url -OutFile $file -UseBasicParsing
+        } catch {
+            Write-Warning "No se pudo descargar ${url}: $($_.Exception.Message)"
+            continue
+        }
         $actual = (Get-FileHash $file -Algorithm SHA256).Hash
-        if ($actual -ne $pin.Sha256) { throw "Hash inválido para $name`n  esperado $($pin.Sha256)`n  obtenido $actual" }
+        if ($actual -eq $pin.Sha256) { return $file }
+        Write-Warning "Hash inválido desde $url (esperado $($pin.Sha256), obtenido $actual)"
     }
-    return $file
+    throw "No se pudo obtener $name con el hash esperado"
 }
 
 function Expand-Pinned([string]$name) {
@@ -112,6 +122,15 @@ Copy-Item "$platformTools\NOTICE.txt" "$app\licenses\adb-NOTICE.txt"
 
 Step 'App de la tablet'
 Copy-Item $Apk "$app\tools\NexScreen.apk"
+# El host compara esta versión con la instalada en la tablet para actualizar la app al enchufarla.
+$sdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { "$env:LOCALAPPDATA\Android\Sdk" }
+$aapt = Get-ChildItem "$sdk\build-tools" -Recurse -Filter aapt2.exe -ErrorAction SilentlyContinue |
+    Sort-Object FullName -Descending | Select-Object -First 1
+if (-not $aapt) { throw "No se encontró aapt2 en $sdk\build-tools" }
+$badging = (& $aapt.FullName dump badging $Apk | Select-Object -First 1)
+if ($badging -notmatch "versionCode='(\d+)' versionName='([^']+)'") { throw "No se pudo leer la versión del APK: $badging" }
+@{ versionCode = [int]$Matches[1]; versionName = $Matches[2] } | ConvertTo-Json | Set-Content -Encoding utf8 "$app\tools\NexScreen.apk.json"
+Write-Host "APK $($Matches[2]) (versionCode $($Matches[1]))"
 
 Step 'Monitor virtual'
 Copy-Item (Get-Pinned 'driver') "$app\driver\VirtualDisplayDriver.zip"

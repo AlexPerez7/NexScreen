@@ -1,0 +1,85 @@
+# Publica una versión al crear un tag vX.Y.Z:
+#   git tag v0.5.0
+#   git push origin v0.5.0
+# Compila y prueba el host, firma el APK con la clave de NexScreen (secretos del repo), arma el
+# instalador y crea el release con NexScreen-Setup-X.Y.Z.exe y NexScreen-X.Y.Z.apk.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Versión del tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "El tag debe ser vX.Y.Z (recibido: ${{ github.ref_name }})" }
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Tests del host
+        run: dotnet test host -c Release
+
+      - name: APK firmado
+        shell: pwsh
+        env:
+          KEYSTORE_BASE64: ${{ secrets.NEXSCREEN_KEYSTORE_BASE64 }}
+          NEXSCREEN_KEYSTORE_PASSWORD: ${{ secrets.NEXSCREEN_KEYSTORE_PASSWORD }}
+          NEXSCREEN_KEY_ALIAS: ${{ secrets.NEXSCREEN_KEY_ALIAS }}
+        run: |
+          if (-not $env:KEYSTORE_BASE64) { throw 'Faltan los secretos de firma del APK (NEXSCREEN_KEYSTORE_BASE64...)' }
+          $keystore = Join-Path $env:RUNNER_TEMP 'nexscreen-release.jks'
+          [IO.File]::WriteAllBytes($keystore, [Convert]::FromBase64String($env:KEYSTORE_BASE64))
+          $env:NEXSCREEN_KEYSTORE = $keystore
+          android\gradlew.bat -p android assembleRelease "-PversionName=${{ steps.version.outputs.value }}" --console=plain
+          if ($LASTEXITCODE -ne 0) { throw 'Falló la compilación del APK' }
+          Remove-Item $keystore
+
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+          }
+
+      - name: Instalador
+        shell: pwsh
+        run: installer\build.ps1 -Apk android\app\build\outputs\apk\release\app-release.apk -Version ${{ steps.version.outputs.value }}
+
+      - name: Publicar el release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = '${{ steps.version.outputs.value }}'
+          Copy-Item android\app\build\outputs\apk\release\app-release.apk "dist\NexScreen-$version.apk"
+          $notes = @"
+          ## Instalación
+
+          1. Descarga **NexScreen-Setup-$version.exe** e instálalo en el PC.
+          2. En la tablet activa *Opciones de desarrollador → Depuración USB* y enchúfala: NexScreen le
+             instala la app y se conecta solo. También puedes instalar **NexScreen-$version.apk** a mano.
+
+          Por WiFi: abre la app en la tablet y toca tu PC en "PCs en la red" (red marcada como Privada).
+
+          "@
+          gh release create '${{ github.ref_name }}' "dist\NexScreen-Setup-$version.exe" "dist\NexScreen-$version.apk" `
+            --title "NexScreen $version" --notes $notes --generate-notes

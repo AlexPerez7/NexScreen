@@ -25,6 +25,8 @@ internal interface IAdb
     Task<AdbResult> ReverseAsync(string serial, int port, CancellationToken ct);
 
     Task<AdbResult> InstallAsync(string serial, string apkPath, CancellationToken ct);
+
+    Task<AdbResult> UninstallAsync(string serial, string package, CancellationToken ct);
 }
 
 /// <summary>
@@ -44,16 +46,21 @@ internal sealed class UsbAutoConnector
     private readonly Func<bool> _sessionActive;
     private readonly IUsbObserver _observer;
     private readonly string? _apkPath;
+    private readonly int? _apkVersionCode;
     private readonly HashSet<string> _prepared = new();
     private readonly HashSet<string> _warnedUnauthorized = new();
 
-    public UsbAutoConnector(IAdb adb, int port, Func<bool> sessionActive, IUsbObserver observer, string? apkPath = null)
+    /// <param name="apkPath">APK que deja el instalador para instalar o actualizar la app.</param>
+    /// <param name="apkVersionCode">versionCode de ese APK; si la tablet tiene uno menor, se actualiza.</param>
+    public UsbAutoConnector(
+        IAdb adb, int port, Func<bool> sessionActive, IUsbObserver observer, string? apkPath = null, int? apkVersionCode = null)
     {
         _adb = adb;
         _port = port;
         _sessionActive = sessionActive;
         _observer = observer;
         _apkPath = apkPath;
+        _apkVersionCode = apkVersionCode;
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -112,24 +119,7 @@ internal sealed class UsbAutoConnector
             return;
         }
 
-        var package = await _adb.ShellAsync(device.Serial, $"pm path {AppPackage}", ct).ConfigureAwait(false);
-        if (!package.Output.Contains("package:", StringComparison.Ordinal))
-        {
-            if (_apkPath is null || !File.Exists(_apkPath))
-            {
-                Log.Warn($"{device.DisplayName}: la app NexScreen no está instalada");
-                _observer.OnAppMissing(device.DisplayName);
-                return;
-            }
-
-            Log.Info($"{device.DisplayName}: instalando la app NexScreen");
-            var install = await _adb.InstallAsync(device.Serial, _apkPath, ct).ConfigureAwait(false);
-            if (!install.Success)
-            {
-                Fail(device, $"no se pudo instalar la app: {install.Output.Trim()}");
-                return;
-            }
-        }
+        if (!await EnsureAppAsync(device, ct).ConfigureAwait(false)) return;
 
         var start = await _adb.ShellAsync(
             device.Serial, $"am start -n {AppPackage}/.MainActivity --es {AutoConnectExtra} usb", ct).ConfigureAwait(false);
@@ -141,6 +131,58 @@ internal sealed class UsbAutoConnector
 
         Log.Info($"{device.DisplayName}: app abierta, conectando por USB");
         _observer.OnTabletLaunched(device.DisplayName);
+    }
+
+    /// <summary>
+    /// Instala la app si falta o la actualiza si es más vieja que el APK incluido.
+    /// Devuelve false si la tablet quedó sin app utilizable.
+    /// </summary>
+    private async Task<bool> EnsureAppAsync(AdbDevice device, CancellationToken ct)
+    {
+        var installed = await InstalledVersionCodeAsync(device.Serial, ct).ConfigureAwait(false);
+        var hasApk = _apkPath is not null && File.Exists(_apkPath);
+        var outdated = installed is not null && _apkVersionCode is { } bundled && installed < bundled;
+
+        if (installed is not null && !outdated) return true;
+        if (!hasApk)
+        {
+            if (installed is not null) return true; // vieja, pero sirve
+            Log.Warn($"{device.DisplayName}: la app NexScreen no está instalada");
+            _observer.OnAppMissing(device.DisplayName);
+            return false;
+        }
+
+        Log.Info(installed is null
+            ? $"{device.DisplayName}: instalando la app NexScreen"
+            : $"{device.DisplayName}: actualizando la app NexScreen ({installed} → {_apkVersionCode})");
+        var install = await _adb.InstallAsync(device.Serial, _apkPath!, ct).ConfigureAwait(false);
+
+        if (!install.Success && install.Output.Contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE", StringComparison.Ordinal))
+        {
+            // Firmada con otra clave (por ejemplo, una versión de desarrollo): Android no deja
+            // actualizarla encima, hay que desinstalarla. Solo se pierden las preferencias de la app.
+            Log.Warn($"{device.DisplayName}: la app instalada tiene otra firma; se reinstala");
+            await _adb.UninstallAsync(device.Serial, AppPackage, ct).ConfigureAwait(false);
+            install = await _adb.InstallAsync(device.Serial, _apkPath!, ct).ConfigureAwait(false);
+        }
+
+        if (!install.Success)
+        {
+            Fail(device, $"no se pudo instalar la app: {install.Output.Trim()}");
+            return installed is not null;
+        }
+
+        return true;
+    }
+
+    /// <summary>versionCode de la app en la tablet, o null si no está instalada.</summary>
+    private async Task<int?> InstalledVersionCodeAsync(string serial, CancellationToken ct)
+    {
+        var dump = await _adb.ShellAsync(serial, $"dumpsys package {AppPackage}", ct).ConfigureAwait(false);
+        if (!dump.Output.Contains($"Package [{AppPackage}]", StringComparison.Ordinal)) return null;
+
+        var match = System.Text.RegularExpressions.Regex.Match(dump.Output, @"versionCode=(\d+)");
+        return match.Success ? int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : 0;
     }
 
     private void Fail(AdbDevice device, string message)

@@ -47,6 +47,9 @@ internal sealed class AdbClient : IAdb
     public Task<AdbResult> InstallAsync(string serial, string apkPath, CancellationToken ct) =>
         RunAsync(["-s", serial, "install", "-r", apkPath], ct, TimeSpan.FromMinutes(2));
 
+    public Task<AdbResult> UninstallAsync(string serial, string package, CancellationToken ct) =>
+        RunAsync(["-s", serial, "uninstall", package], ct);
+
     /// <summary>Salida de "adb devices -l" → dispositivos. Ignora el encabezado y los mensajes del daemon.</summary>
     internal static IReadOnlyList<AdbDevice> ParseDevices(string output)
     {

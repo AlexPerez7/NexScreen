@@ -35,6 +35,24 @@ internal static class ToolLocator
         return File.Exists(apk) ? apk : null;
     }
 
+    /// <summary>
+    /// versionCode del APK incluido (lo escribe installer\build.ps1 en NexScreen.apk.json), o null.
+    /// </summary>
+    public static int? BundledApkVersionCode()
+    {
+        var path = Path.Combine(ToolsDirectory, "NexScreen.apk.json");
+        try
+        {
+            using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+            return json.RootElement.GetProperty("versionCode").GetInt32();
+        }
+        catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or KeyNotFoundException
+                                       or InvalidOperationException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>True si el ejecutable existe y responde al argumento indicado.</summary>
     public static bool Runs(string path, string arguments)
     {
