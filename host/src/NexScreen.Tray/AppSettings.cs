@@ -47,6 +47,12 @@ internal sealed class AppSettings
     /// </summary>
     public bool StartupConfigured { get; set; }
 
+    /// <summary>Buscar versiones nuevas en GitHub al iniciar y cada 24 h.</summary>
+    public bool CheckForUpdates { get; set; } = true;
+
+    /// <summary>Última versión nueva que se avisó con un globo (para no repetir el aviso cada día).</summary>
+    public string? NotifiedUpdate { get; set; }
+
     public static int BitrateMbps(Quality quality) => quality switch
     {
         Quality.High => 20,

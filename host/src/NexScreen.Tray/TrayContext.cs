@@ -1,7 +1,9 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using NexScreen.Core;
 using NexScreen.Core.Display;
 using NexScreen.Core.Net;
+using NexScreen.Core.Update;
 using NexScreen.Core.Usb;
 
 namespace NexScreen.Tray;
@@ -15,8 +17,16 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
 {
     private static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(5);
 
-    private static readonly string AppVersion =
-        typeof(TrayContext).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+    private static readonly TimeSpan FirstUpdateCheckDelay = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromHours(24);
+
+    private static readonly Version CurrentVersion =
+        typeof(TrayContext).Assembly.GetName().Version ?? new Version(0, 0, 0);
+
+    private static readonly string AppVersion = CurrentVersion.ToString(3);
+
+    private static readonly string UpdatesDirectory = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "NexScreen", "updates");
 
     private readonly SynchronizationContext _ui = new WindowsFormsSynchronizationContext();
     private readonly AppSettings _settings = AppSettings.Load();
@@ -36,6 +46,13 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
     private Task _usbTask = Task.CompletedTask;
     private string? _device;
     private bool _exiting;
+
+    // Actualizaciones: la versión nueva encontrada (si hay) y su opción del menú.
+    private readonly UpdateClient _updates = new(AppVersion);
+    private readonly ToolStripMenuItem _installUpdate = new() { Visible = false };
+    private UpdateRelease? _availableUpdate;
+    private bool _updating;
+    private Action? _balloonClick;
 
     public TrayContext()
     {
@@ -69,14 +86,19 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         menu.Items.Add(new ToolStripMenuItem("Abrir NexScreen en la tablet (USB)", null, async (_, _) => await ConnectUsbNowAsync()));
         menu.Items.Add(_startWithWindows);
         menu.Items.Add(new ToolStripMenuItem("Abrir el registro", null, (_, _) => OpenLog()));
+        menu.Items.Add(new ToolStripMenuItem($"Buscar actualizaciones (versión {AppVersion})", null, async (_, _) => await CheckForUpdateAsync(manual: true)));
+        _installUpdate.Click += async (_, _) => await InstallUpdateAsync();
+        menu.Items.Add(_installUpdate);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Salir", null, async (_, _) => await ExitAsync()));
 
         _notifyIcon = new NotifyIcon { ContextMenuStrip = menu, Visible = true };
         _notifyIcon.DoubleClick += (_, _) => ShowStatusBalloon();
+        _notifyIcon.BalloonTipClicked += (_, _) => _balloonClick?.Invoke();
         SetState(TrayState.Waiting, "Iniciando…");
 
         _ = StartServerAsync();
+        if (_settings.CheckForUpdates) _ = CheckForUpdatesPeriodicallyAsync();
     }
 
     // ---- Menú ----
@@ -172,7 +194,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         {
             Log.Error(error);
             SetState(TrayState.Error, "No se pudo iniciar");
-            _notifyIcon.ShowBalloonTip(10_000, "NexScreen no pudo iniciar", error, ToolTipIcon.Error);
+            ShowBalloon(10_000, "NexScreen no pudo iniciar", error, ToolTipIcon.Error);
             return;
         }
 
@@ -198,7 +220,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
                 _ui.Post(_ =>
                 {
                     SetState(TrayState.Error, "El servidor se detuvo");
-                    _notifyIcon.ShowBalloonTip(10_000, "NexScreen se detuvo", ex.Message, ToolTipIcon.Error);
+                    ShowBalloon(10_000, "NexScreen se detuvo", ex.Message, ToolTipIcon.Error);
                 }, null);
             }
         });
@@ -238,7 +260,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
     {
         if (_usb is null)
         {
-            _notifyIcon.ShowBalloonTip(5_000, "NexScreen", "La autoconexión USB no está disponible (no se encontró adb).", ToolTipIcon.Warning);
+            ShowBalloon(5_000, "NexScreen", "La autoconexión USB no está disponible (no se encontró adb).", ToolTipIcon.Warning);
             return;
         }
 
@@ -275,7 +297,164 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         ExitThread();
     }
 
+    // ---- Actualizaciones ----
+
+    private async Task CheckForUpdatesPeriodicallyAsync()
+    {
+        try
+        {
+            await Task.Delay(FirstUpdateCheckDelay, _appCts.Token);
+            while (true)
+            {
+                await CheckForUpdateAsync(manual: false);
+                await Task.Delay(UpdateCheckInterval, _appCts.Token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Consulta GitHub. Si hay una versión nueva muestra la opción para instalarla y la avisa con un
+    /// globo (una sola vez por versión si la búsqueda es automática).
+    /// </summary>
+    private async Task CheckForUpdateAsync(bool manual)
+    {
+        if (_updating) return;
+        UpdateRelease? release;
+        try
+        {
+            release = await _updates.GetLatestAsync(_appCts.Token);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            if (_appCts.IsCancellationRequested) return;
+            Log.Warn($"No se pudo buscar actualizaciones: {ex.Message}");
+            if (manual) ShowBalloon(5_000, "NexScreen", "No se pudo consultar si hay una versión nueva. Revisa la conexión a internet.", ToolTipIcon.Warning);
+            return;
+        }
+
+        if (release is null || !release.IsNewerThan(CurrentVersion))
+        {
+            if (manual) ShowBalloon(5_000, "NexScreen está al día", $"Tienes la última versión ({AppVersion}).", ToolTipIcon.Info);
+            return;
+        }
+
+        var version = release.Version.ToString(3);
+        if (_availableUpdate?.Version != release.Version) Log.Info($"Hay una versión nueva de NexScreen: {version}");
+        _availableUpdate = release;
+        _installUpdate.Text = $"Instalar la versión {version}";
+        _installUpdate.Visible = true;
+
+        if (manual || _settings.NotifiedUpdate != version)
+        {
+            _settings.NotifiedUpdate = version;
+            _settings.Save();
+            ShowBalloon(15_000, $"NexScreen {version} disponible",
+                "Haz clic aquí para instalarla (o usa la opción del menú de NexScreen).", ToolTipIcon.Info,
+                () => _ = InstallUpdateAsync());
+        }
+    }
+
+    /// <summary>
+    /// Descarga el instalador, detiene el servidor (para quitar el monitor virtual antes de que el
+    /// instalador cierre la app) y lo ejecuta en modo silencioso. El instalador vuelve a abrir
+    /// NexScreen al terminar (<c>/RELAUNCH=1</c>). Si el usuario cancela el permiso de
+    /// administrador, el servidor vuelve a arrancar y no pasa nada.
+    /// </summary>
+    private async Task InstallUpdateAsync()
+    {
+        if (_availableUpdate is not { } release || _updating || _exiting) return;
+        _updating = true;
+        var version = release.Version.ToString(3);
+        var previousStatus = _status.Text ?? "";
+        _installUpdate.Enabled = false;
+        _installUpdate.Text = $"Descargando la versión {version}…";
+
+        try
+        {
+            string installer;
+            try
+            {
+                DeleteOldInstallers(release.InstallerName);
+                installer = await _updates.DownloadAsync(release, UpdatesDirectory, _appCts.Token);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or UnauthorizedAccessException
+                                           or TaskCanceledException)
+            {
+                if (_appCts.IsCancellationRequested) return;
+                Log.Error($"No se pudo descargar la versión {version}: {ex.Message}");
+                ShowBalloon(8_000, "No se pudo descargar la actualización", ex.Message, ToolTipIcon.Error);
+                return;
+            }
+
+            Log.Info($"Instalando la versión {version} ({installer})");
+            SetState(TrayState.Waiting, $"Instalando la versión {version}…");
+            await StopServerAsync();
+            try
+            {
+                // UseShellExecute: el instalador pide permisos de administrador (UAC).
+                Process.Start(new ProcessStartInfo(installer, "/SILENT /SUPPRESSMSGBOXES /NORESTART /RELAUNCH=1")
+                {
+                    UseShellExecute = true,
+                });
+            }
+            catch (Win32Exception ex)
+            {
+                // 1223: el usuario canceló el pedido de permisos.
+                if (ex.NativeErrorCode != 1223)
+                {
+                    Log.Error($"No se pudo ejecutar el instalador: {ex.Message}");
+                    ShowBalloon(8_000, "No se pudo instalar la actualización", ex.Message, ToolTipIcon.Error);
+                }
+                else
+                {
+                    Log.Info("Se canceló la instalación de la actualización");
+                }
+
+                SetState(TrayState.Waiting, previousStatus);
+                await StartServerAsync();
+                return;
+            }
+
+            await ExitAsync();
+        }
+        finally
+        {
+            _updating = false;
+            if (!_exiting)
+            {
+                _installUpdate.Enabled = true;
+                _installUpdate.Text = $"Instalar la versión {version}";
+            }
+        }
+    }
+
+    private static void DeleteOldInstallers(string keep)
+    {
+        if (!Directory.Exists(UpdatesDirectory)) return;
+        foreach (var file in Directory.EnumerateFiles(UpdatesDirectory))
+        {
+            if (string.Equals(Path.GetFileName(file), keep, StringComparison.OrdinalIgnoreCase)) continue;
+            try
+            {
+                File.Delete(file);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+
     // ---- Estado ----
+
+    /// <summary>Muestra un globo. <paramref name="onClick"/> se ejecuta si el usuario hace clic en él.</summary>
+    private void ShowBalloon(int timeout, string title, string text, ToolTipIcon icon, Action? onClick = null)
+    {
+        _balloonClick = onClick;
+        _notifyIcon.ShowBalloonTip(timeout, title, text, icon);
+    }
 
     private void SetState(TrayState state, string text)
     {
@@ -291,14 +470,14 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         var text = _device is null
             ? "Conecta la tablet por USB o WiFi y abre la app NexScreen."
             : _status.Text ?? "";
-        _notifyIcon.ShowBalloonTip(5_000, "NexScreen", text, ToolTipIcon.Info);
+        ShowBalloon(5_000, "NexScreen", text, ToolTipIcon.Info);
     }
 
     void IStreamObserver.OnClientConnected(string device, int width, int height) => _ui.Post(_ =>
     {
         _device = device;
         SetState(TrayState.Connected, $"Conectada: {device} ({width}×{height})");
-        _notifyIcon.ShowBalloonTip(3_000, "Tablet conectada", device, ToolTipIcon.None);
+        ShowBalloon(3_000, "Tablet conectada", device, ToolTipIcon.None);
     }, null);
 
     void IStreamObserver.OnStats(double fps, double mbps) => _ui.Post(_ =>
@@ -314,7 +493,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         SetState(TrayState.Waiting, "Esperando la tablet");
         if (reason is not null && device is not null)
         {
-            _notifyIcon.ShowBalloonTip(5_000, "Tablet desconectada", reason, ToolTipIcon.Warning);
+            ShowBalloon(5_000, "Tablet desconectada", reason, ToolTipIcon.Warning);
         }
     }, null);
 
@@ -324,16 +503,16 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
     }, null);
 
     void IUsbObserver.OnTabletUnauthorized(string device) => _ui.Post(_ =>
-        _notifyIcon.ShowBalloonTip(10_000, "Autoriza la depuración USB",
+        ShowBalloon(10_000, "Autoriza la depuración USB",
             $"En la pantalla de {device} acepta \"Permitir depuración USB\" (marca \"Permitir siempre\").",
             ToolTipIcon.Warning), null);
 
     void IUsbObserver.OnAppMissing(string device) => _ui.Post(_ =>
-        _notifyIcon.ShowBalloonTip(10_000, "Falta la app en la tablet",
+        ShowBalloon(10_000, "Falta la app en la tablet",
             $"Instala la app NexScreen en {device} para usarla como monitor.", ToolTipIcon.Warning), null);
 
     void IUsbObserver.OnUsbError(string message) => _ui.Post(_ =>
-        _notifyIcon.ShowBalloonTip(8_000, "Problema con la conexión USB", message, ToolTipIcon.Warning), null);
+        ShowBalloon(8_000, "Problema con la conexión USB", message, ToolTipIcon.Warning), null);
 
     protected override void Dispose(bool disposing)
     {
@@ -343,6 +522,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
             _icons.Dispose();
             _serverCts?.Dispose();
             _appCts.Dispose();
+            _updates.Dispose();
         }
 
         base.Dispose(disposing);

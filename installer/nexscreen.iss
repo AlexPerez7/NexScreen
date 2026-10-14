@@ -70,6 +70,9 @@ Filename: "powershell.exe"; \
 ; Se abre como el usuario que inició la instalación (no como el administrador que la autorizó),
 ; así NexScreen queda en su sesión y se configura para iniciar con su Windows.
 Filename: "{app}\{#AppExe}"; Description: "Abrir NexScreen"; Flags: nowait postinstall skipifsilent runasoriginaluser
+; Actualización desde la bandeja (/SILENT /RELAUNCH=1): la app se cerró para actualizarse y se
+; vuelve a abrir sola. Una instalación silenciosa sin /RELAUNCH=1 (p. ej. de IT) no la abre.
+Filename: "{app}\{#AppExe}"; Flags: nowait runasoriginaluser; Check: ShouldRelaunch
 
 [UninstallRun]
 Filename: "taskkill.exe"; Parameters: "/F /IM {#AppExe}"; Flags: runhidden; RunOnceId: "CloseApp"
@@ -83,3 +86,9 @@ Filename: "powershell.exe"; \
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\tools"
+
+[Code]
+function ShouldRelaunch: Boolean;
+begin
+  Result := WizardSilent and (ExpandConstant('{param:RELAUNCH|0}') = '1');
+end;

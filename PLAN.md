@@ -32,13 +32,10 @@ keyframe (cada 2 s), y el bitrate es fijo aunque el WiFi se congestione.
 - Medir la cola de envío del socket y el RTT (ya se mide con PING) para bajar o subir el bitrate.
 - Ya estaba previsto en docs/protocol.md ("Cambios previstos").
 
-### 3. Actualización automática de la app de Windows — S
+### 3. Actualización automática de la app de Windows — ✅ hecho
 
-**Qué:** la bandeja avisa cuando hay una versión nueva en GitHub Releases y la instala con un clic.
-
-**Cómo:** consultar `https://api.github.com/repos/AlexPerez7/NexScreen/releases/latest` al iniciar
-(y cada 24 h), comparar con la versión del ensamblado, descargar `NexScreen-Setup-X.Y.Z.exe` y
-correrlo con `/SILENT`. La app de la tablet ya se actualiza sola al enchufarla.
+La bandeja busca versiones nuevas en GitHub Releases y las instala con un clic (ver CLAUDE.md,
+"Actualización automática"). La app de la tablet ya se actualiza sola al enchufarla.
 
 ## Prioridad media
 

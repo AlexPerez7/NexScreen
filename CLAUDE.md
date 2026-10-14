@@ -34,6 +34,7 @@ host/src/NexScreen.Core/      Lógica del host (librería, net8.0-windows)
   Net/                        StreamServer, ClientSession, IStreamObserver (eventos para la UI)
   Display/                    Monitor virtual: API CCD, GDI, DXGI, driver VDD
   Input/                      Táctil y lápiz: mensaje POINTER, traductor de frames, inyección Win32
+  Update/                     Actualización automática: GitHub Releases, descarga y verificación
   HostStartup.cs              Preparación común (ffmpeg, modo, limpieza del monitor virtual)
   ToolLocator.cs              ffmpeg/adb en tools\ junto al exe (instalador) o en el PATH
 host/src/NexScreen.Tray/      App de bandeja (WinForms) -> NexScreen.exe. Uso diario.
@@ -180,6 +181,22 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 - `versionCode` del APK = mayor×10000 + menor×100 + parche. El host compara el del APK incluido
   (`tools\NexScreen.apk.json`, lo escribe build.ps1 con aapt2) con el de la tablet y actualiza la app.
 - ffmpeg se descarga primero de la copia propia (release `build-deps`, pre-release) y si no, de BtbN.
+
+## Actualización automática
+
+- La bandeja consulta `api.github.com/repos/AlexPerez7/NexScreen/releases/latest` al minuto de
+  iniciar y cada 24 h (`Update/UpdateClient.cs`; se desactiva con `"checkForUpdates": false` en
+  `settings.json`). `/releases/latest` ignora los pre-release (como `build-deps`).
+- Si hay una versión nueva aparece "Instalar la versión X.Y.Z" en el menú y un globo (una vez por
+  versión, `notifiedUpdate`). Al instalar: descarga en `%LOCALAPPDATA%\NexScreen\updates`, verifica
+  tamaño y el SHA-256 que publica GitHub (`digest` del asset), detiene el servidor (quita el monitor
+  virtual) y corre el instalador con `/SILENT /SUPPRESSMSGBOXES /NORESTART /RELAUNCH=1`. Pide UAC;
+  si se cancela, el servidor vuelve a arrancar.
+- `/RELAUNCH=1` hace que el instalador vuelva a abrir NexScreen como el usuario original
+  (`ShouldRelaunch` en el `.iss`). Una instalación silenciosa sin ese parámetro no la abre.
+- El asset debe llamarse `NexScreen-Setup-X.Y.Z.exe` y el tag `vX.Y.Z`: no cambiar esos nombres
+  en `release.yml` sin actualizar `UpdateRelease.cs`.
+- La 0.4.0 no tiene el actualizador: el salto a la primera versión con él se instala a mano.
 
 ## Protocolo
 
