@@ -40,6 +40,12 @@ internal enum MessageType : byte
     PairResult = 0x05,
     Video = 0x10,
 
+    /// <summary>
+    /// Tablet → host, sin payload: el decoder falló y necesita un keyframe para recuperarse.
+    /// Un host que no lo conoce lo ignora y la tablet espera el keyframe periódico.
+    /// </summary>
+    RequestKeyframe = 0x11,
+
     /// <summary>Tablet → host: dedos y lápiz. Ver PointerMessage.</summary>
     Pointer = 0x20,
     Ping = 0x30,

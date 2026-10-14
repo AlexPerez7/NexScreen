@@ -39,6 +39,7 @@ Enteros en big-endian. Payload máximo: 16 MiB.
 | 0x04 | PAIR | tablet → host | JSON `{"proof":"<hex>"}` |
 | 0x05 | PAIR_RESULT | host → tablet | JSON `{"ok":false,"error":"Código incorrecto.","retry":true}` |
 | 0x10 | VIDEO  | host → tablet | `[i64 ptsUs][u8 flags][access unit H.264 Annex-B]` |
+| 0x11 | REQUEST_KEYFRAME | tablet → host | vacío |
 | 0x20 | POINTER | tablet → host | `[u8 cantidad]` + cantidad × entrada de 12 bytes (ver abajo) |
 | 0x30 | PING   | ambos | `[i64 timestamp µs del emisor]` |
 | 0x31 | PONG   | ambos | eco exacto del payload del PING |
@@ -49,6 +50,24 @@ Enteros en big-endian. Payload máximo: 16 MiB.
 |-----|-------------|
 | 0x01 | Keyframe (IDR) |
 | 0x02 | Configuración del codec (solo SPS/PPS); se pasa al decoder con `BUFFER_FLAG_CODEC_CONFIG` |
+
+Un VIDEO de configuración puede llegar a mitad de sesión: el host reemplazó la captura (por un
+pedido de keyframe, un cambio de bitrate o un reinicio). Si los SPS/PPS son idénticos a los
+anteriores la tablet sigue con el mismo decoder; si cambiaron, crea uno nuevo. Después siempre
+llega un keyframe.
+
+### Pedido de keyframe y bitrate adaptativo
+
+- **REQUEST_KEYFRAME:** la tablet lo envía cuando el decoder falla. Crea un decoder nuevo con los
+  últimos SPS/PPS, descarta los cuadros hasta el próximo keyframe y lo pide. El host reemplaza la
+  captura (como mucho una vez por segundo) y el primer cuadro nuevo es un keyframe. Un host que no
+  conoce el mensaje lo ignora y la tablet espera el keyframe periódico (cada 2 s).
+- **Bitrate:** lo decide el host sin mensajes nuevos. Cada segundo mide qué fracción del tiempo el
+  envío del video estuvo bloqueado esperando al socket (buffer de envío de 256 KiB): con ≥ 50 % en
+  un segundo, o ≥ 25 % en dos seguidos, baja al 70 % (o al 85 % de lo que llegó a enviar, si es
+  menos), con un piso de ¼ del máximo. Tras 10 s holgados y con carga real (≥ 40 % del bitrate) sube
+  un paso de ⅙ del máximo; si esa subida congestiona antes de 15 s, la espera se duplica (hasta 60 s).
+  Al bajar, los cuadros de la captura vieja se descartan hasta que entra la nueva, para vaciar la red.
 
 ### Entrada de POINTER (12 bytes)
 
@@ -133,6 +152,6 @@ y la red tiene que estar marcada como Privada.
 
 Una versión de protocolo distinta entre host y tablet aborta la sesión en el handshake.
 Los tipos de mensaje nuevos se agregan sin subir la versión si el otro extremo puede ignorarlos
-(POINTER se agregó así: un host viejo lo descarta). La v2 agregó TLS y el emparejamiento por WiFi:
+(POINTER y REQUEST_KEYFRAME se agregaron así: un host viejo los descarta). La v2 agregó TLS y el emparejamiento por WiFi:
 es incompatible con la v1 (la app de la tablet se actualiza sola al enchufarla por USB).
-Cambios previstos: pedido de keyframe y bitrate adaptativo.
+

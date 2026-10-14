@@ -271,7 +271,7 @@ public class PairingTests
         {
         }
 
-        public void OnStats(double fps, double mbps)
+        public void OnStats(StreamStats stats)
         {
         }
 

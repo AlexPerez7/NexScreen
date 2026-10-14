@@ -35,7 +35,9 @@ internal sealed class HostOptions
                             (por defecto: donde la dejaste la última vez en Configuración; right la primera vez)
           --monitor <n>     Al espejar: índice del monitor a capturar, orden DXGI (por defecto 0)
           --fps <n>         Cuadros por segundo (por defecto 60)
-          --bitrate <n>     Bitrate en Mbps (por defecto 12)
+          --bitrate <n>     Bitrate máximo en Mbps (por defecto 12). Si la red no da abasto, se
+                            baja solo y vuelve a subir cuando la red se recupera
+          --fixed-bitrate   No adaptar el bitrate a la red
           --encoder <e>     auto | qsv | mf | x264 (por defecto auto: Quick Sync, si no Media
                             Foundation, si no x264)
           --ffmpeg <ruta>   Ruta a ffmpeg.exe (por defecto se busca en PATH)
@@ -54,6 +56,9 @@ internal sealed class HostOptions
     public int Monitor { get; set; }
     public int Fps { get; set; } = 60;
     public int BitrateMbps { get; set; } = 12;
+
+    /// <summary>Bajar el bitrate si la red se congestiona (<see cref="BitrateMbps"/> es el máximo).</summary>
+    public bool AdaptiveBitrate { get; set; } = true;
     public EncoderKind Encoder { get; set; } = EncoderKind.Auto;
     public string FfmpegPath { get; set; } = ToolLocator.Find("ffmpeg");
     public bool Verbose { get; set; }
@@ -91,6 +96,9 @@ internal sealed class HostOptions
                     break;
                 case "--bitrate":
                     options.BitrateMbps = ParseInt(arg, NextValue(args, ref i), 1, 200);
+                    break;
+                case "--fixed-bitrate":
+                    options.AdaptiveBitrate = false;
                     break;
                 case "--encoder":
                     options.Encoder = ParseEnum<EncoderKind>(arg, NextValue(args, ref i));

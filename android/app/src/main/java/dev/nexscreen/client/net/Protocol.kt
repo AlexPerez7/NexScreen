@@ -23,6 +23,9 @@ object Protocol {
     const val TYPE_PAIR = 0x04
     const val TYPE_PAIR_RESULT = 0x05
     const val TYPE_VIDEO = 0x10
+
+    /** Tablet → host, sin payload: el decoder falló y necesita un keyframe. Un host viejo lo ignora. */
+    const val TYPE_REQUEST_KEYFRAME = 0x11
     const val TYPE_POINTER = 0x20
     const val TYPE_PING = 0x30
     const val TYPE_PONG = 0x31

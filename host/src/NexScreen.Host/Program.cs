@@ -128,7 +128,7 @@ file sealed class ConsoleStreamObserver : IStreamObserver
     {
     }
 
-    public void OnStats(double fps, double mbps)
+    public void OnStats(StreamStats stats)
     {
     }
 

@@ -1,13 +1,19 @@
 namespace NexScreen.Core.Net;
 
 /// <summary>
+/// Estadísticas del stream de los últimos segundos. <see cref="BitrateMbps"/> es el bitrate del
+/// encoder en este momento: queda por debajo de <see cref="MaxBitrateMbps"/> si la red se congestionó.
+/// </summary>
+internal readonly record struct StreamStats(double Fps, double Mbps, int BitrateMbps, int MaxBitrateMbps);
+
+/// <summary>
 /// Eventos del servidor para la interfaz (la app de bandeja). Se llaman desde hilos de fondo.
 /// </summary>
 internal interface IStreamObserver
 {
     void OnClientConnected(string device, int width, int height);
 
-    void OnStats(double fps, double mbps);
+    void OnStats(StreamStats stats);
 
     void OnClientDisconnected(string? reason);
 
@@ -29,7 +35,7 @@ internal sealed class NullStreamObserver : IStreamObserver
     {
     }
 
-    public void OnStats(double fps, double mbps)
+    public void OnStats(StreamStats stats)
     {
     }
 

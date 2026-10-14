@@ -3,6 +3,22 @@
 Lo nuevo de cada versión de NexScreen. Cada release de GitHub muestra la sección de su versión
 (ver `scripts/release-notes.ps1`): **agregar la sección antes de crear el tag**.
 
+## [0.6.0] - sin publicar
+
+### Novedades
+
+- **Bitrate adaptativo.** Si el WiFi no da abasto, NexScreen baja la calidad del video en vez de
+  acumular atraso, y la vuelve a subir de a poco cuando la red se recupera. La calidad elegida en
+  la bandeja ("Alta", "Normal", "Ahorro") es ahora el máximo. Mientras está reducida, la bandeja
+  lo indica ("red lenta").
+
+### Mejoras
+
+- Si la tablet tiene un error al decodificar el video, se recupera sola en menos de un segundo
+  (le pide al PC una imagen completa) en vez de cortar la conexión.
+- Los reinicios de la captura (por ejemplo, al reordenar las pantallas) ya no reinician el
+  decoder de la tablet cuando no cambió la configuración del video.
+
 ## [0.5.0] - 2026-10-14
 
 ### Novedades

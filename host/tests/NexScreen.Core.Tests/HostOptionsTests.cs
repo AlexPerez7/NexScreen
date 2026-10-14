@@ -13,6 +13,13 @@ public class HostOptionsTests
         Assert.Equal(60, options.Fps);
         Assert.Equal(EncoderKind.Auto, options.Encoder);
         Assert.Null(options.Position);
+        Assert.True(options.AdaptiveBitrate);
+    }
+
+    [Fact]
+    public void ParsesFixedBitrate()
+    {
+        Assert.False(HostOptions.Parse(["--fixed-bitrate"]).AdaptiveBitrate);
     }
 
     [Fact]

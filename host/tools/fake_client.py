@@ -2,8 +2,12 @@
 
 Uso: python tools/fake_client.py [--host 127.0.0.1] [--port 27190] [--seconds 5] [--out capture.h264]
                                  [--pen-hover] [--pin 123456] [--identity <carpeta>]
+                                 [--request-keyframe <s>] [--limit-mbps <n> [--limit-seconds <s>]]
 El archivo resultante se puede validar con: ffprobe capture.h264
 --pen-hover acerca un lápiz virtual al centro del monitor y lo aleja (mueve el cursor, no hace clic).
+--request-keyframe <s> pide un keyframe a los s segundos, como la app cuando falla el decoder.
+--limit-mbps <n> lee como mucho n Mbps, para simular un WiFi lento (el host debería bajar el bitrate).
+Con --limit-seconds <s> el límite dura s segundos y después la red queda libre (el host debería volver a subir).
 
 Con --host 127.0.0.1 se comporta como una conexión USB (sin cifrar). Con otra IP usa TLS como la
 app por WiFi (requiere el paquete "cryptography"): la primera vez el host pide el PIN, que se pasa
@@ -23,7 +27,7 @@ import time
 from pathlib import Path
 
 HELLO, CONFIG, PAIR_REQUIRED, PAIR, PAIR_RESULT = 0x01, 0x02, 0x03, 0x04, 0x05
-VIDEO, POINTER, PING, PONG = 0x10, 0x20, 0x30, 0x31
+VIDEO, REQUEST_KEYFRAME, POINTER, PING, PONG = 0x10, 0x11, 0x20, 0x30, 0x31
 PROTOCOL = 2
 TOOL_PEN, ACTION_HOVER, ACTION_HOVER_EXIT = 1, 4, 5
 
@@ -92,9 +96,17 @@ def main() -> None:
     parser.add_argument("--pen-hover", action="store_true", help="probar la inyección de lápiz sin hacer clic")
     parser.add_argument("--pin", help="PIN de emparejamiento (por WiFi); si falta, se pregunta")
     parser.add_argument("--identity", type=Path, default=Path.home() / ".nexscreen-fake-client")
+    parser.add_argument("--request-keyframe", type=float, metavar="S", help="pedir un keyframe a los S segundos")
+    parser.add_argument("--limit-mbps", type=float, help="leer como mucho N Mbps (simula un WiFi lento)")
+    parser.add_argument("--limit-seconds", type=float, help="quitar el límite de --limit-mbps a los S segundos")
     args = parser.parse_args()
 
-    sock = socket.create_connection((args.host, args.port), timeout=10)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if args.limit_mbps:
+        # Buffer chico: así la ventana de TCP se llena enseguida y el host lo nota.
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 64 * 1024)
+    sock.settimeout(10)
+    sock.connect((args.host, args.port))
     sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     usb = args.host == "127.0.0.1"
     host_fp = client_fp = None
@@ -135,6 +147,17 @@ def main() -> None:
             elif args.pen_hover and hover_step == 20 and elapsed > args.seconds - 1:
                 send(sock, POINTER, pointer(0, TOOL_PEN, ACTION_HOVER_EXIT, 0.59, 0.5))
                 hover_step += 1
+            if args.request_keyframe is not None and elapsed > args.request_keyframe:
+                send(sock, REQUEST_KEYFRAME, b"")
+                print(f"t={elapsed:.2f}s: pedido de keyframe")
+                args.request_keyframe = None
+            if args.limit_mbps and args.limit_seconds is not None and elapsed > args.limit_seconds:
+                print(f"t={elapsed:.2f}s: sin límite de lectura")
+                args.limit_mbps = None
+            if args.limit_mbps:
+                ahead = total * 8 / (args.limit_mbps * 1e6) - elapsed
+                if ahead > 0:
+                    time.sleep(ahead)
             if time.monotonic() - last_ping > 1:
                 send(sock, PING, struct.pack(">q", time.monotonic_ns() // 1000))
                 last_ping = time.monotonic()
@@ -166,7 +189,7 @@ def main() -> None:
                 out.write(payload[9:])
                 total += length
                 if flags & 2:
-                    print(f"config frame ({length - 9} bytes)")
+                    print(f"t={time.monotonic() - start:.2f}s: config frame ({length - 9} bytes)")
                     continue
                 frames += 1
                 keyframes += flags & 1

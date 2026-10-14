@@ -4,6 +4,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
+import dev.nexscreen.client.video.DecoderFailedException
 import dev.nexscreen.client.video.VideoDecoder
 import org.json.JSONObject
 import java.io.EOFException
@@ -75,6 +76,18 @@ class StreamClient(
     // Android no permite escribir en la red desde el hilo de UI, que es donde llegan los toques.
     private val inputExecutor = Executors.newSingleThreadExecutor { Thread(it, "nexscreen-input") }
 
+    // Estado del video: solo lo usa el hilo de red.
+    private var decoder: VideoDecoder? = null
+    private var videoWidth = 0
+    private var videoHeight = 0
+
+    /** SPS/PPS vigentes, para configurar un decoder nuevo sin esperar al host. */
+    private var codecConfig: ByteArray? = null
+
+    /** Tras recrear el decoder se descartan cuadros hasta el próximo keyframe. */
+    private var awaitingKeyframe = false
+    private val decoderFailures = ArrayDeque<Long>()
+
     private val renderedFrames = AtomicInteger()
     private var receivedBytes = 0L
     private var lastRttMs: Float? = null
@@ -129,7 +142,6 @@ class StreamClient(
     }
 
     private fun run() {
-        var decoder: VideoDecoder? = null
         var error: Throwable? = null
         try {
             listener.onConnecting()
@@ -159,9 +171,6 @@ class StreamClient(
 
             var lastPing = 0L
             var lastStats = SystemClock.elapsedRealtime()
-            var videoWidth = 0
-            var videoHeight = 0
-            var decoderConfigured = false
             while (running) {
                 val message = channel.read()
                 when (message.type) {
@@ -196,37 +205,13 @@ class StreamClient(
                         this.channel = channel
                         videoWidth = config.getInt("maxWidth")
                         videoHeight = config.getInt("maxHeight")
-                        decoder?.release()
-                        decoder = VideoDecoder(surface, videoWidth, videoHeight, decoderListener).also { it.start() }
-                        decoderConfigured = false
+                        codecConfig = null
+                        awaitingKeyframe = false
+                        decoderFailures.clear()
+                        restartDecoder()
                         listener.onConnected()
                     }
-                    Protocol.TYPE_VIDEO -> {
-                        val payload = message.payload
-                        if (payload.size <= Protocol.VIDEO_PREFIX_SIZE) continue
-                        val prefix = ByteBuffer.wrap(payload, 0, Protocol.VIDEO_PREFIX_SIZE)
-                        val ptsUs = prefix.long
-                        val flags = prefix.get().toInt()
-                        if (flags and Protocol.FLAG_CONFIG != 0) {
-                            // SPS/PPS nuevos a mitad de sesión: el host reinició la captura.
-                            // Un decoder limpio evita artefactos si cambiaron los parámetros.
-                            if (decoderConfigured) {
-                                Log.i(TAG, "Nueva configuración de video, reiniciando el decoder")
-                                decoder?.release()
-                                decoder = VideoDecoder(surface, videoWidth, videoHeight, decoderListener)
-                                    .also { it.start() }
-                            }
-                            decoderConfigured = true
-                        }
-                        decoder?.queue(
-                            payload,
-                            Protocol.VIDEO_PREFIX_SIZE,
-                            payload.size - Protocol.VIDEO_PREFIX_SIZE,
-                            ptsUs,
-                            flags,
-                        )
-                        receivedBytes += payload.size
-                    }
+                    Protocol.TYPE_VIDEO -> onVideo(channel, message.payload)
                     Protocol.TYPE_PING -> channel.write(Protocol.TYPE_PONG, message.payload)
                     Protocol.TYPE_PONG -> {
                         val sentUs = ByteBuffer.wrap(message.payload).long
@@ -262,9 +247,65 @@ class StreamClient(
             channel = null
             pairingChannel = null
             decoder?.release()
+            decoder = null
             socket?.close()
             if (running) listener.onDisconnected(error)
         }
+    }
+
+    private fun onVideo(channel: MessageChannel, payload: ByteArray) {
+        if (payload.size <= Protocol.VIDEO_PREFIX_SIZE) return
+        receivedBytes += payload.size
+        val prefix = ByteBuffer.wrap(payload, 0, Protocol.VIDEO_PREFIX_SIZE)
+        val ptsUs = prefix.long
+        val flags = prefix.get().toInt()
+        if (flags and Protocol.FLAG_CONFIG != 0) {
+            // SPS/PPS a mitad de sesión: el host reemplazó la captura (keyframe pedido, otro bitrate o
+            // un reinicio). Si son los mismos, el decoder sigue sirviendo y el keyframe que viene lo
+            // resincroniza; si cambiaron, uno limpio evita artefactos.
+            val config = payload.copyOfRange(Protocol.VIDEO_PREFIX_SIZE, payload.size)
+            val previous = codecConfig
+            if (previous != null && previous.contentEquals(config)) return
+            if (previous != null) {
+                Log.i(TAG, "Nueva configuración de video, reiniciando el decoder")
+                restartDecoder()
+            }
+            codecConfig = config
+        } else if (awaitingKeyframe) {
+            if (flags and Protocol.FLAG_KEY_FRAME == 0) return
+            awaitingKeyframe = false
+        }
+
+        try {
+            decoder?.queue(payload, Protocol.VIDEO_PREFIX_SIZE, payload.size - Protocol.VIDEO_PREFIX_SIZE, ptsUs, flags)
+        } catch (e: DecoderFailedException) {
+            recoverDecoder(channel, e)
+        }
+    }
+
+    /**
+     * El decoder falló (por ejemplo, con un cuadro dañado): en vez de cortar la conexión, crear uno
+     * nuevo con los SPS/PPS guardados y pedirle un keyframe al host. Un host que no conoce el pedido
+     * lo ignora y el keyframe periódico (cada 2 s) llega igual.
+     */
+    private fun recoverDecoder(channel: MessageChannel, error: DecoderFailedException) {
+        val now = SystemClock.elapsedRealtime()
+        while (decoderFailures.isNotEmpty() && now - decoderFailures.first() > DECODER_FAILURE_WINDOW_MS) {
+            decoderFailures.removeFirst()
+        }
+        if (decoderFailures.size >= MAX_DECODER_FAILURES) throw IOException("El decoder falló varias veces seguidas", error)
+        decoderFailures.addLast(now)
+
+        Log.w(TAG, "Recuperando el decoder y pidiendo un keyframe", error)
+        restartDecoder()
+        codecConfig?.let { decoder?.queue(it, 0, it.size, 0, Protocol.FLAG_CONFIG) }
+        awaitingKeyframe = true
+        channel.write(Protocol.TYPE_REQUEST_KEYFRAME, ByteArray(0))
+    }
+
+    private fun restartDecoder() {
+        decoder?.release()
+        decoder = VideoDecoder(surface, videoWidth, videoHeight, decoderListener).also { it.start() }
     }
 
     private val decoderListener = object : VideoDecoder.Listener {
@@ -311,5 +352,7 @@ class StreamClient(
         const val TLS_TIMEOUT_MS = 5000
         const val PING_INTERVAL_MS = 1000L
         const val STATS_INTERVAL_MS = 1000L
+        const val MAX_DECODER_FAILURES = 3
+        const val DECODER_FAILURE_WINDOW_MS = 10_000L
     }
 }

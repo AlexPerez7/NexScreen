@@ -515,9 +515,12 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         ShowBalloon(3_000, "Tablet conectada", device, ToolTipIcon.None);
     }, null);
 
-    void IStreamObserver.OnStats(double fps, double mbps) => _ui.Post(_ =>
+    void IStreamObserver.OnStats(StreamStats stats) => _ui.Post(_ =>
     {
-        if (_device is not null) SetState(TrayState.Connected, $"Conectada: {_device} · {fps:F0} fps · {mbps:F1} Mbps");
+        if (_device is null) return;
+        var text = $"Conectada: {_device} · {stats.Fps:F0} fps · {stats.Mbps:F1} Mbps";
+        if (stats.BitrateMbps < stats.MaxBitrateMbps) text += $" (red lenta: máx {stats.BitrateMbps} Mbps)";
+        SetState(TrayState.Connected, text);
     }, null);
 
     void IStreamObserver.OnClientDisconnected(string? reason) => _ui.Post(_ =>

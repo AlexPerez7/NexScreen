@@ -22,6 +22,7 @@ NexScreen convierte una tablet Android (desarrollado con una Samsung Galaxy Tab 
 | 3 | Táctil y S Pen (presión) hacia Windows | ✅ |
 | 4 | App de bandeja, autoconexión, instalador, releases | ✅ |
 | 5 | Actualización automática, TLS y emparejamiento por WiFi (protocolo v2) | ✅ |
+| 6 | Pedido de keyframe y bitrate adaptativo | ✅ |
 
 Ideas para próximas versiones, priorizadas y con notas técnicas: `PLAN.md`.
 
@@ -32,7 +33,7 @@ host/Directory.Build.props    Versión de NexScreen (única fuente) y configurac
 host/src/NexScreen.Core/      Lógica del host (librería, net8.0-windows)
   Protocol/                   Framing y mensajes (Wire.cs)
   Video/                      ffmpeg (ddagrab + h264_qsv/x264) -> FLV -> Annex-B
-  Net/                        StreamServer, ClientSession, IStreamObserver (eventos para la UI)
+  Net/                        StreamServer, ClientSession, VideoStreamer, IStreamObserver (eventos para la UI)
   Display/                    Monitor virtual: API CCD, GDI, DXGI, driver VDD
   Input/                      Táctil y lápiz: mensaje POINTER, traductor de frames, inyección Win32
   Security/                   WiFi: certificado del host, PIN de emparejamiento, tablets emparejadas
@@ -136,7 +137,7 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 - **Escala (DPI) por monitor:** no hay API pública. Se usa la interna de Configuración →
   Pantalla: `DisplayConfigGet/SetDeviceInfo` con tipos -3/-4 (`DisplayConfig.cs`). Los valores
   son relativos a la escala recomendada por Windows (`DpiScale.cs`). Se aplica antes de capturar.
-- Al reordenar pantallas, Windows invalida Desktop Duplication (`887a0026`); `ClientSession`
+- Al reordenar pantallas, Windows invalida Desktop Duplication (`887a0026`); `VideoStreamer`
   reinicia la captura sin cortar la conexión.
 - La posición elegida por el usuario se guarda en `%APPDATA%\NexScreen\host-state.json`
   (el usuario tiene la tablet a la izquierda del notebook).
@@ -229,6 +230,23 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 - El asset debe llamarse `NexScreen-Setup-X.Y.Z.exe` y el tag `vX.Y.Z`: no cambiar esos nombres
   en `release.yml` sin actualizar `UpdateRelease.cs`.
 - La 0.4.0 no tiene el actualizador: el salto a la primera versión con él se instala a mano.
+
+## Video: keyframe a pedido y bitrate adaptativo
+
+- `Net/VideoStreamer.cs` mantiene la captura viva (reintentos, cambio de encoder, sesión
+  bloqueada) y la **reemplaza en caliente**: arranca un ffmpeg nuevo mientras el viejo sigue
+  transmitiendo y pasa al nuevo con su primer cuadro (SPS/PPS + IDR). Desktop Duplication admite
+  dos capturas de la misma pantalla a la vez. El arranque de ffmpeg con Quick Sync tarda ~350 ms.
+- Se reemplaza por un `REQUEST_KEYFRAME` de la tablet (máximo uno por segundo) o por un bitrate
+  nuevo de `Video/BitrateController.cs` (AIMD, lógica pura con tests; reglas en docs/protocol.md).
+  Al bajar por congestión se descartan los cuadros viejos hasta que entra la captura nueva.
+- `--bitrate` (y la "Calidad" de la bandeja) es el **máximo**; `--fixed-bitrate` desactiva la
+  adaptación. La bandeja muestra "red lenta" si el bitrate está por debajo del máximo.
+- Probar sin tablet: `fake_client.py --limit-mbps 1 --limit-seconds 8 --seconds 50` (baja al piso y
+  vuelve a subir) y `--request-keyframe 3`. Con `--mode mirror --no-usb` la consola no agrega el
+  monitor virtual ni le avisa a la tablet por USB.
+- En la tablet, `StreamClient` guarda los SPS/PPS: si el decoder falla lo recrea, pide un
+  keyframe y descarta cuadros hasta recibirlo (más de 3 fallas en 10 s cortan la conexión).
 
 ## Protocolo
 

@@ -30,7 +30,13 @@ inyectar toques. Agregar emparejamiento y cifrado.
 
 </details>
 
-### 2. Pedido de keyframe y bitrate adaptativo — M
+### 2. Pedido de keyframe y bitrate adaptativo — ✅ hecho
+
+Mensaje `REQUEST_KEYFRAME` y bitrate AIMD medido por el bloqueo del socket (ver docs/protocol.md y
+CLAUDE.md, "Video"). Con ffmpeg ambas cosas se hacen reemplazando la captura en caliente (~350 ms
+de arranque, sin cortar la imagen); el pipeline nativo (idea 7) lo haría sin reemplazar nada.
+
+<details><summary>Notas originales</summary>
 
 **Qué:** hoy, si se pierde o corrompe un cuadro, la imagen queda con artefactos hasta el próximo
 keyframe (cada 2 s), y el bitrate es fijo aunque el WiFi se congestione.
@@ -41,6 +47,8 @@ keyframe (cada 2 s), y el bitrate es fijo aunque el WiFi se congestione.
   resolverlo con el pipeline nativo (idea 7).
 - Medir la cola de envío del socket y el RTT (ya se mide con PING) para bajar o subir el bitrate.
 - Ya estaba previsto en docs/protocol.md ("Cambios previstos").
+
+</details>
 
 ### 3. Actualización automática de la app de Windows — ✅ hecho
 
