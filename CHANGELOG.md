@@ -3,7 +3,7 @@
 Lo nuevo de cada versión de NexScreen. Cada release de GitHub muestra la sección de su versión
 (ver `scripts/release-notes.ps1`): **agregar la sección antes de crear el tag**.
 
-## [0.6.0] - sin publicar
+## [0.6.0] - 2026-10-15
 
 ### Novedades
 

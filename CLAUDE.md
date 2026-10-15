@@ -31,6 +31,20 @@ docs "tablet" suele querer decir "el dispositivo Android"; en los textos para el
 
 Ideas para próximas versiones, priorizadas y con notas técnicas: `PLAN.md`.
 
+## Equipos del usuario
+
+El proyecto se trabaja en dos PCs. Los datos de uno no valen para el otro.
+
+| | Trabajo (usuario `AlexPerez`) | Personal (usuario `alexm`) |
+|---|---|---|
+| CPU / GPU | i7-13620H, solo Intel UHD (Quick Sync) | i5-13420H, Intel UHD + NVIDIA RTX 4060 Laptop (NVENC) |
+| Red WiFi | "Fenita_5G", PC 192.168.1.88, tablet 192.168.1.87 (red Privada desde el 2026-10-14) | "Universidad Catolica 5G", PC 192.168.100.24 (perfil Público el 2026-10-15) |
+| NexScreen instalado | 0.4.1 local, se actualiza solo | No |
+| Clave de firma del APK | Sí | No |
+| Herramientas | Android Studio y SDK | .NET SDK 8, Inno Setup, platform-tools y Android Studio instalados con winget el 2026-10-15; el SDK de Android y el firewall/driver del monitor virtual faltan |
+
+Antes de asumir un dato de red o de hardware, verificar en qué PC se está (`$env:USERNAME`).
+
 ## Estructura
 
 ```
@@ -112,9 +126,9 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 - **Scripts de Python que reescriben archivos**: `Path.write_text` en Windows convierte `\n` en
   CRLF y después Edit no encuentra los textos. Escribir bytes o usar `newline="\n"`.
 - `InternalsVisibleTo` usa el nombre del **ensamblado** (`nexscreen-host`, `NexScreen`), no el del proyecto.
-- **WiFi:** el PC tiene IP 192.168.1.88 en la red "Fenita_5G" (marcada como Privada el 2026-10-14
-  a pedido del usuario) y la tablet 192.168.1.87. Reglas de firewall "NexScreen" (TCP 27190) y
-  "NexScreen (descubrimiento)" (UDP 27191) creadas con `scripts/allow-firewall.ps1`.
+- **WiFi:** las reglas de firewall "NexScreen" (TCP 27190) y "NexScreen (descubrimiento)"
+  (UDP 27191) se crean con `scripts/allow-firewall.ps1`. Datos de red por equipo en "Equipos del
+  usuario".
 - **Leer el log con PowerShell 5** requiere `Get-Content -Encoding UTF8`; sin eso los acentos salen
   mal y `Select-String` no encuentra palabras con tilde.
 - Para ver la pantalla de la tablet sin pedirle nada al usuario: `adb shell uiautomator dump` +
@@ -123,8 +137,8 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
   `gradlew --stop` y matar los `java.exe` que queden.
 - **Reiniciar el servidor adb** (`adb kill-server`) hace que la tablet vuelva a pedir autorización
   de depuración USB: avisarle al usuario.
-- El PC no tiene GPU dedicada: Intel UHD (i7-13620H). Quick Sync funciona. NVENC y AMF **no se
-  pueden probar aquí**: en este PC fallan al instante y la cadena sigue con el siguiente encoder.
+- En un PC sin GPU NVIDIA/AMD (el del trabajo) NVENC y AMF **no se pueden probar**: fallan al
+  instante y la cadena sigue con el siguiente encoder. Para probarlos hay que usar el PC personal.
 - `scale_d3d11` del ffmpeg 9 incluido falla en este Intel ("Could not create the texture"): por
   eso NVENC/AMF escalan por CPU cuando hace falta, en vez de en la GPU.
 - No hay feed NuGet global: el repo trae `host/nuget.config`.
@@ -192,8 +206,9 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 - **Publicar:** `git tag vX.Y.Z` + `git push origin vX.Y.Z`. El workflow `.github/workflows/release.yml`
   corre los tests, firma el APK, arma el instalador con esa versión y crea el release con
   `NexScreen-Setup-X.Y.Z.exe` y `NexScreen-X.Y.Z.apk`. CI (`ci.yml`) compila y prueba cada push.
-- **Clave de firma del APK:** `C:\Users\AlexPerez\.nexscreen\nexscreen-release.jks` (datos en
-  `signing.json` de esa carpeta). Copia en los secretos del repo (`NEXSCREEN_KEYSTORE_BASE64`,
+- **Clave de firma del APK:** `%USERPROFILE%\.nexscreen\nexscreen-release.jks` (datos en
+  `signing.json` de esa carpeta). Solo existe en el PC del trabajo; el personal no la tiene (hay
+  que copiarla, o firmar solo con el workflow de GitHub). Copia en los secretos del repo (`NEXSCREEN_KEYSTORE_BASE64`,
   `NEXSCREEN_KEYSTORE_PASSWORD`, `NEXSCREEN_KEY_ALIAS`). **Si se pierde, las tablets no pueden
   actualizar la app**: hay que desinstalarla (el host lo hace solo si detecta otra firma).
 - Para firmar en el PC: cargar `signing.json` en las variables `NEXSCREEN_KEYSTORE`,
