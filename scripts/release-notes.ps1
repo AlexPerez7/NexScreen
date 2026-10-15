@@ -41,6 +41,14 @@ $changes
 
 Por WiFi: abre la app en la tablet y toca tu PC en "PCs en la red" (red marcada como Privada). La
 primera vez la tablet te pide el código que muestra el PC.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://signpath.io), certificate by
+[SignPath Foundation](https://signpath.org). The Windows installer is signed once the project is
+approved by SignPath Foundation; earlier releases are unsigned.
+See the [code signing policy](https://github.com/AlexPerez7/NexScreen#code-signing-policy) and the
+[privacy policy](https://github.com/AlexPerez7/NexScreen/blob/main/PRIVACY.md).
 "@
 
 if ($OutFile) { [IO.File]::WriteAllText($OutFile, $notes, [Text.UTF8Encoding]::new($false)) }

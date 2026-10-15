@@ -4,239 +4,251 @@
 
 # NexScreen
 
-**Convierte tu tablet o celular Android en un monitor extendido de Windows, por USB o WiFi, con táctil y lápiz.**
+**Turn your Android tablet or phone into an extended monitor for Windows, over USB or WiFi, with touch and stylus support.**
 
-[![Release](https://img.shields.io/github/v/release/AlexPerez7/NexScreen?label=versi%C3%B3n&color=4C9AFF)](https://github.com/AlexPerez7/NexScreen/releases/latest)
+[![Release](https://img.shields.io/github/v/release/AlexPerez7/NexScreen?label=release&color=4C9AFF)](https://github.com/AlexPerez7/NexScreen/releases/latest)
 [![CI](https://github.com/AlexPerez7/NexScreen/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexPerez7/NexScreen/actions/workflows/ci.yml)
-[![Descargas](https://img.shields.io/github/downloads/AlexPerez7/NexScreen/total?label=descargas&color=4C9AFF)](https://github.com/AlexPerez7/NexScreen/releases)
+[![Downloads](https://img.shields.io/github/downloads/AlexPerez7/NexScreen/total?label=downloads&color=4C9AFF)](https://github.com/AlexPerez7/NexScreen/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-4C9AFF)](LICENSE)
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white)
 ![Android 8+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 
-[Descargar](https://github.com/AlexPerez7/NexScreen/releases/latest) ·
-[Novedades](CHANGELOG.md) ·
-[Protocolo](docs/protocol.md) ·
-[Hoja de ruta](PLAN.md)
+[Download](https://github.com/AlexPerez7/NexScreen/releases/latest) ·
+[Changelog](CHANGELOG.md) ·
+[Protocol](docs/protocol.md) ·
+[Roadmap](PLAN.md) ·
+[Español](README.es.md)
 
 </div>
 
 ---
 
-NexScreen hace que Windows vea tu tablet (o tu celular) como **una pantalla más**: puedes arrastrar ventanas hacia
-ella, usarla con los dedos o con el lápiz, y desconectarla sin que queden ventanas perdidas. No
-hace falta cuenta, servidor ni configuración: enchufas la tablet y funciona.
+NexScreen makes Windows see your tablet (or phone) as **just another display**: drag windows onto
+it, use it with your fingers or a stylus, and unplug it without leaving lost windows behind. No
+account, no server, no setup: plug in the tablet and it works.
 
-## Características
+## Features
 
 | | |
 |---|---|
-| 🖥️ **Monitor real** | Un monitor virtual con la resolución y la frecuencia nativas del dispositivo (60, 90 o 120 Hz), sin la zona de la cámara en los celulares, y la escala de Windows elegida según su pantalla. Lo ubicas a la izquierda, derecha, arriba o abajo, como cualquier pantalla. También puede espejar un monitor existente. |
-| ✍️ **Táctil y lápiz** | Tocar es clic, dos dedos desplazan y hacen zoom. El S Pen llega a Windows como un lápiz de verdad: presión, inclinación, botón lateral y rechazo de palma. |
-| 🔌 **USB sin configurar** | Al enchufar la tablet, NexScreen instala la app, la abre y se conecta. También la actualiza cuando hay una versión nueva. |
-| 📶 **WiFi seguro** | La tablet encuentra el PC en la red. Todo el tráfico va cifrado (TLS) y cada tablet se empareja una vez con un código de 6 dígitos. |
-| ⚡ **Baja latencia** | Pipeline propio sin ffmpeg: Desktop Duplication, conversión en la GPU y H.264 por hardware (NVIDIA NVENC directo; Intel Quick Sync y AMD por Media Foundation), con decodificación por hardware en el dispositivo. Sostiene los 90 fps de la tablet de desarrollo y llega hasta 120 fps si la pantalla lo admite. ffmpeg queda como respaldo. |
-| 📉 **Se adapta a la red** | Si el WiFi se congestiona, baja la calidad en vez de acumular atraso y la recupera sola. Si la imagen se daña, la tablet pide una completa y se recupera en menos de un segundo. |
-| 🔄 **Se mantiene solo** | Ícono en la bandeja, inicio con Windows y actualizaciones automáticas desde GitHub. |
+| 🖥️ **A real monitor** | A virtual display with the device's native resolution and refresh rate (60, 90 or 120 Hz), without the camera cutout area on phones, and a Windows scale chosen to fit its screen. Place it left, right, above or below, like any display. It can also mirror an existing monitor. |
+| ✍️ **Touch and stylus** | Tap to click, two fingers to scroll and zoom. The S Pen reaches Windows as a real pen: pressure, tilt, side button and palm rejection. |
+| 🔌 **Zero-config USB** | Plug in the tablet and NexScreen installs the app, opens it and connects. It also updates the app when there is a new version. |
+| 📶 **Secure WiFi** | The tablet finds the PC on the network. All traffic is encrypted (TLS) and each device is paired once with a 6-digit code. |
+| ⚡ **Low latency** | Own capture pipeline, no ffmpeg: Desktop Duplication, GPU color conversion and hardware H.264 (NVIDIA NVENC directly; Intel Quick Sync and AMD through Media Foundation), with hardware decoding on the device. Sustains the 90 fps of the development tablet and up to 120 fps if the screen supports it. ffmpeg remains as a fallback. |
+| 📉 **Adapts to the network** | If the WiFi gets congested it lowers the quality instead of building up lag, and recovers on its own. If the picture gets corrupted, the tablet asks for a full frame and recovers in under a second. |
+| 🔄 **Looks after itself** | Tray icon, start with Windows and automatic updates from GitHub (can be turned off). |
 
-## Requisitos
+## Requirements
 
-| | Mínimo | Probado con |
+| | Minimum | Tested with |
 |---|---|---|
-| **PC** | Windows 10 u 11 de 64 bits | Notebook con Intel Core i7-13620H (gráficos Intel UHD) |
-| **Tablet o celular** | Android 8.0 o superior | Samsung Galaxy Tab S9 FE (2304×1440, 90 Hz, Android 16) |
-| **Video** | Cualquier PC: usa el encoder de la GPU de la pantalla (Intel, NVIDIA o AMD) y, si no hay, Media Foundation por CPU (hasta 60 fps) | |
-| **WiFi** (opcional) | PC y tablet en la misma red, marcada como **Privada** en Windows | |
+| **PC** | 64-bit Windows 10 or 11 | Laptops with an Intel Core i7-13620H (Intel UHD graphics) and an i5-13420H (+ NVIDIA RTX 4060) |
+| **Tablet or phone** | Android 8.0 or later | Samsung Galaxy Tab S9 FE (2304×1440, 90 Hz, Android 16) |
+| **Video** | Any PC: uses the encoder of the GPU that drives the screen (Intel, NVIDIA or AMD) and, if there is none, Media Foundation on the CPU (up to 60 fps) | |
+| **WiFi** (optional) | PC and tablet on the same network, set as **Private** in Windows | |
 
-## Instalación
+## Installation
 
-1. Descarga **`NexScreen-Setup-<versión>.exe`** desde
-   [Releases](https://github.com/AlexPerez7/NexScreen/releases/latest) y ejecútalo. Pide permisos de
-   administrador para instalar el monitor virtual y abrir el firewall.
-2. En la tablet, activa **Opciones de desarrollador → Depuración USB** (una sola vez) y acepta el
-   aviso de depuración cuando la enchufes.
-3. Enchufa la tablet. NexScreen instala la app, la abre y la tablet pasa a ser tu segunda pantalla.
+1. Download **`NexScreen-Setup-<version>.exe`** from
+   [Releases](https://github.com/AlexPerez7/NexScreen/releases/latest) and run it. It asks for
+   administrator rights to install the virtual display and open the firewall.
+2. On the tablet, enable **Developer options → USB debugging** (once) and accept the debugging
+   prompt when you plug it in.
+3. Plug in the tablet. NexScreen installs the app, opens it, and the tablet becomes your second
+   screen.
 
 > [!NOTE]
-> El instalador todavía no está firmado, así que Windows SmartScreen puede mostrar una advertencia.
-> Elige **Más información → Ejecutar de todas formas**.
+> The installer is not code-signed yet (see [Code signing policy](#code-signing-policy)), so
+> Windows SmartScreen may show a warning. Choose **More info → Run anyway**.
 
-### Conectar por WiFi
+The installer shows what it changes on your system before installing, and the only internet
+connection NexScreen makes is the optional update check (see the [privacy policy](PRIVACY.md)).
 
-Abre NexScreen en la tablet y toca tu PC en la lista **PCs en la red** (o escribe su IP). La primera
-vez el PC muestra un código de 6 dígitos que tienes que ingresar en la tablet; después se conecta
-sola.
+### Connecting over WiFi
 
-## Uso
+Open NexScreen on the tablet and tap your PC in the **PCs on the network** list (or type its IP).
+The first time, the PC shows a 6-digit code that you enter on the tablet; after that it connects
+by itself.
 
-NexScreen vive en un ícono junto al reloj. Con clic derecho eliges:
+## Usage
 
-- **Modo:** extender el escritorio o espejar un monitor.
-- **Posición** de la tablet respecto del PC (también puedes moverla en *Configuración → Pantalla*;
-  NexScreen recuerda dónde la dejaste).
-- **Calidad:** Alta (20 Mbps), Normal (12 Mbps) o Ahorro (6 Mbps). Es el máximo: si la red no da
-  abasto, baja sola y la bandeja lo indica.
-- **Escala** de Windows para la tablet, iniciar con Windows y las tablets emparejadas por WiFi.
+NexScreen lives in an icon next to the clock. Right-click it to choose:
 
-## Solución de problemas
+- **Mode:** extend the desktop or mirror a monitor.
+- **Position** of the tablet relative to the PC (you can also move it in *Settings → Display*;
+  NexScreen remembers where you left it).
+- **Quality:** High (20 Mbps), Normal (12 Mbps) or Saver (6 Mbps). This is the maximum: if the
+  network can't keep up, it lowers itself and the tray shows it.
+- Windows **scale** for the tablet, start with Windows, automatic update checks and the devices
+  paired over WiFi.
+
+## Troubleshooting
 
 <details>
-<summary><b>La tablet no aparece en "PCs en la red"</b></summary>
+<summary><b>The tablet doesn't appear in "PCs on the network"</b></summary>
 
-La red WiFi tiene que estar marcada como **Privada** en Windows (*Configuración → Red e Internet →
-propiedades de la red*). El instalador crea las reglas de firewall para TCP 27190 y UDP 27191; si
-las borraste, ejecuta `scripts\allow-firewall.ps1` como administrador. Mientras tanto puedes
-escribir la IP del PC a mano.
+The WiFi network must be set as **Private** in Windows (*Settings → Network & internet → network
+properties*). The installer creates the firewall rules for TCP 27190 and UDP 27191; if you deleted
+them, run `scripts\allow-firewall.ps1` as administrator. Meanwhile you can type the PC's IP by hand.
 </details>
 
 <details>
-<summary><b>Al enchufar la tablet no pasa nada</b></summary>
+<summary><b>Nothing happens when I plug in the tablet</b></summary>
 
-Revisa que la depuración USB esté activa y que hayas aceptado el aviso en la tablet ("¿Permitir
-depuración USB?"). Algunos cables solo cargan: prueba con otro.
+Check that USB debugging is on and that you accepted the prompt on the tablet ("Allow USB
+debugging?"). Some cables only charge: try another one.
 </details>
 
 <details>
-<summary><b>La imagen se congela con la sesión de Windows bloqueada</b></summary>
+<summary><b>The picture freezes while the Windows session is locked</b></summary>
 
-Es esperado: Windows no permite capturar la pantalla de bloqueo. La transmisión sigue sola al
-desbloquear.
+This is expected: Windows doesn't allow capturing the lock screen. The stream resumes by itself
+when you unlock.
 </details>
 
 <details>
-<summary><b>El texto se ve muy chico en la tablet</b></summary>
+<summary><b>Text looks too small on the tablet</b></summary>
 
-Por defecto la escala es **Automática**: se elige según la densidad de la pantalla (150 % en una
-tablet de 11", 250-300 % en un celular). Si prefieres otro tamaño, cámbiala desde **Escala** en el
-menú de la bandeja.
+The scale is **Automatic** by default: it is chosen from the screen density (150% on an 11" tablet,
+250-300% on a phone). If you prefer another size, change it from **Scale** in the tray menu.
 </details>
 
-## Cómo funciona
+## How it works
 
 ```mermaid
 flowchart LR
-    subgraph PC["PC con Windows"]
-        VDD["Monitor virtual<br/>(Virtual Display Driver)"] --> CAP["Desktop Duplication<br/>(ddagrab)"]
-        CAP --> ENC["H.264 por hardware<br/>(Quick Sync / NVENC / AMF / Media Foundation)"]
-        ENC --> HOST["NexScreen<br/>bandeja"]
-        INJ["InjectSyntheticPointerInput<br/>(táctil y lápiz)"]
+    subgraph PC["Windows PC"]
+        VDD["Virtual display<br/>(Virtual Display Driver)"] --> CAP["Desktop Duplication"]
+        CAP --> ENC["Hardware H.264<br/>(NVENC / Quick Sync / AMF / Media Foundation)"]
+        ENC --> HOST["NexScreen<br/>tray app"]
+        INJ["InjectSyntheticPointerInput<br/>(touch and pen)"]
     end
-    subgraph TAB["Tablet o celular Android"]
-        DEC["MediaCodec<br/>(baja latencia)"] --> VIEW["Pantalla"]
-        PEN["Dedos y S Pen"]
+    subgraph TAB["Android tablet or phone"]
+        DEC["MediaCodec<br/>(low latency)"] --> VIEW["Screen"]
+        PEN["Fingers and S Pen"]
     end
-    HOST -- "video · TCP 27190<br/>(TLS por WiFi)" --> DEC
+    HOST -- "video · TCP 27190<br/>(TLS over WiFi)" --> DEC
     PEN -- "POINTER" --> HOST
     HOST --> INJ
 ```
 
-- Al conectarse la tablet se agrega un monitor virtual con su resolución nativa (API CCD de
-  Windows) y se quita al desconectarla.
-- Si Windows interrumpe la captura (reordenar pantallas, UAC) se reinicia sin cortar la conexión.
-  Los cambios de calidad y los pedidos de imagen completa se hacen arrancando una captura nueva en
-  paralelo, sin congelar la imagen.
-- Por USB el PC arma un túnel `adb reverse`; por WiFi la tablet busca el PC con un broadcast UDP.
-- El protocolo está documentado en [docs/protocol.md](docs/protocol.md).
+- When the tablet connects, a virtual monitor with its native resolution is added (Windows CCD API)
+  and removed when it disconnects.
+- If Windows interrupts the capture (reordering displays, UAC) it restarts without dropping the
+  connection. With the native pipeline, keyframe requests and bitrate changes are applied directly
+  to the encoder; with the ffmpeg fallback they start a new capture in parallel, without freezing
+  the picture.
+- Over USB the PC sets up an `adb reverse` tunnel; over WiFi the tablet finds the PC with a UDP
+  broadcast.
+- The protocol is documented in [docs/protocol.md](docs/protocol.md).
 
-## Desarrollo
+## Development
 
 <details>
-<summary><b>Compilar y probar</b></summary>
+<summary><b>Build and test</b></summary>
 
-Requisitos: [.NET 8 SDK](https://dotnet.microsoft.com/download), ffmpeg con `ddagrab` y
-`h264_qsv` en el PATH (`winget install Gyan.FFmpeg`), Android Studio (o Android SDK + JDK) e
-[Inno Setup 6](https://jrsoftware.org/isinfo.php) para el instalador.
+Requirements: [.NET 8 SDK](https://dotnet.microsoft.com/download), Android Studio (or the Android
+SDK + a JDK) and [Inno Setup 6](https://jrsoftware.org/isinfo.php) for the installer. For the
+ffmpeg fallback, ffmpeg with `ddagrab` and `h264_qsv` on the PATH (`winget install Gyan.FFmpeg`).
 
 ```powershell
 # Host (Windows)
 dotnet build host
 dotnet test host
-host\src\NexScreen.Tray\bin\Debug\net8.0-windows\NexScreen.exe            # app de bandeja
-host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --help # consola de diagnóstico
+host\src\NexScreen.Tray\bin\Debug\net8.0-windows\NexScreen.exe            # tray app
+host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --help # diagnostics console
 
-# App Android
+# Android app
 android\gradlew.bat -p android assembleDebug
 adb install -r android\app\build\outputs\apk\debug\app-debug.apk
 
-# Monitor virtual (una vez, como administrador) y firewall para WiFi
+# Virtual display (once, as administrator) and firewall for WiFi
 scripts\install-virtual-display.ps1
 scripts\allow-firewall.ps1
 
-# Instalador -> dist\NexScreen-Setup-<versión>.exe
+# Installer -> dist\NexScreen-Setup-<version>.exe
 installer\build.ps1
 ```
 
-Sin tablet, `python host\tools\fake_client.py` simula una: guarda el video recibido y puede
-simular un WiFi lento (`--limit-mbps`) o pedir keyframes (`--request-keyframe`).
-`nexscreen-host --list-displays` muestra las pantallas, el monitor virtual y la escala.
+Without a tablet, `python host\tools\fake_client.py` simulates one: it saves the video it
+receives and can simulate slow WiFi (`--limit-mbps`) or request keyframes (`--request-keyframe`).
+`nexscreen-host --list-displays` shows the displays, the virtual monitor and the scale.
 </details>
 
 <details>
-<summary><b>Estructura del repositorio</b></summary>
+<summary><b>Repository layout</b></summary>
 
 ```
 host/                       Windows (C# / .NET 8)
-  src/NexScreen.Core/       protocolo, video, monitor virtual, input, USB, seguridad, actualizaciones
-  src/NexScreen.Tray/       app de bandeja (NexScreen.exe)
-  src/NexScreen.Host/       consola de desarrollo y diagnóstico (nexscreen-host.exe)
+  src/NexScreen.Core/       protocol, video, virtual display, input, USB, security, updates
+  src/NexScreen.Tray/       tray app (NexScreen.exe)
+  src/NexScreen.Host/       development and diagnostics console (nexscreen-host.exe)
   tests/                    tests (xUnit)
-  tools/                    cliente de prueba y utilidades
-android/                    app de la tablet (Kotlin)
-installer/                  instalador (Inno Setup) y script de build
-scripts/                    monitor virtual, firewall, USB manual, notas de release
-docs/                       protocolo de red
+  tools/                    test client and utilities
+android/                    tablet app (Kotlin)
+installer/                  installer (Inno Setup) and build script
+scripts/                    virtual display, firewall, manual USB, release notes
+docs/                       network protocol
 ```
 </details>
 
 <details>
-<summary><b>Publicar una versión</b></summary>
+<summary><b>Publishing a release</b></summary>
 
-1. Agrega la sección `## [X.Y.Z] - fecha` en [CHANGELOG.md](CHANGELOG.md).
-2. `git tag vX.Y.Z` y `git push origin vX.Y.Z`.
+1. Add the `## [X.Y.Z] - date` section to [CHANGELOG.md](CHANGELOG.md).
+2. `git tag vX.Y.Z` and `git push origin vX.Y.Z`.
 
-GitHub Actions corre los tests, firma el APK, arma el instalador y publica el release con
-`NexScreen-Setup-X.Y.Z.exe` y `NexScreen-X.Y.Z.apk`. Los PCs con NexScreen se actualizan desde la
-bandeja, y las tablets al enchufarlas.
+GitHub Actions runs the tests, signs the APK, builds the installer and publishes the release with
+`NexScreen-Setup-X.Y.Z.exe` and `NexScreen-X.Y.Z.apk`. PCs running NexScreen update from the tray,
+and tablets update when plugged in.
 </details>
 
-## Hoja de ruta
+> The project's internal documentation (`CHANGELOG.md`, `PLAN.md`, `docs/`, `CLAUDE.md`) and the
+> installer and app texts are written in Spanish. A Spanish version of this page is in
+> [README.es.md](README.es.md).
 
-Lo próximo, en orden de prioridad (detalle técnico en [PLAN.md](PLAN.md)):
+## Roadmap
 
-- [x] Monitor extendido, táctil y S Pen, USB y WiFi
-- [x] Instalador, actualizaciones automáticas, WiFi cifrado con emparejamiento
-- [x] Calidad adaptativa a la red y recuperación de errores de video
-- [x] Licencia MIT
-- [ ] Firma del instalador
-- [x] 90 Hz y más
-- [ ] Audio del PC en la tablet
-- [x] Captura y codificación nativas (menos latencia)
-- [ ] Varias tablets a la vez
+Next up, in priority order (technical detail in [PLAN.md](PLAN.md)):
 
-## Créditos
+- [x] Extended monitor, touch and S Pen, USB and WiFi
+- [x] Installer, automatic updates, encrypted WiFi with pairing
+- [x] Network-adaptive quality and video error recovery
+- [x] MIT license
+- [ ] Installer code signing
+- [x] 90 Hz and beyond
+- [ ] PC audio on the tablet
+- [x] Native capture and encoding (lower latency)
+- [ ] Multiple tablets at once
 
-- [farmerbb/SecondScreen](https://github.com/farmerbb/SecondScreen) (Apache 2.0): ideas de
-  perfiles de resolución, pantalla siempre encendida y modo inmersivo.
-- [OnCloud125252/Spacedesk-Viewer](https://github.com/OnCloud125252/Spacedesk-Viewer): concepto de
-  visor liviano que se conecta solo. No se reutiliza código.
-- Componentes incluidos en el instalador (FFmpeg LGPL, adb, Virtual Display Driver, nefcon): ver
+## Credits
+
+- [farmerbb/SecondScreen](https://github.com/farmerbb/SecondScreen) (Apache 2.0): ideas for
+  resolution profiles, always-on screen and immersive mode.
+- [OnCloud125252/Spacedesk-Viewer](https://github.com/OnCloud125252/Spacedesk-Viewer): the concept
+  of a lightweight viewer that connects by itself. No code is reused.
+- Components included in the installer (FFmpeg LGPL, adb, Virtual Display Driver, nefcon): see
   [installer/THIRD-PARTY-NOTICES.md](installer/THIRD-PARTY-NOTICES.md).
 
-## Licencia
+## License
 
-NexScreen se distribuye bajo la [licencia MIT](LICENSE). Los componentes de terceros mantienen
-sus propias licencias (ver [installer/THIRD-PARTY-NOTICES.md](installer/THIRD-PARTY-NOTICES.md)).
+NexScreen is released under the [MIT license](LICENSE). Third-party components keep their own
+licenses (see [installer/THIRD-PARTY-NOTICES.md](installer/THIRD-PARTY-NOTICES.md)).
 
-## Política de firma de código
+## Code signing policy
 
 Free code signing provided by [SignPath.io](https://signpath.io), certificate by
 [SignPath Foundation](https://signpath.org).
 
-*(En trámite: el instalador de Windows se firmará cuando SignPath Foundation apruebe el proyecto.)*
+*(Pending: the Windows installer will be signed once SignPath Foundation approves the project;
+earlier releases are unsigned.)*
 
-- **Qué se firma:** el instalador `NexScreen-Setup-X.Y.Z.exe` y los ejecutables de NexScreen que
-  incluye, compilados por GitHub Actions desde el código de este repositorio
-  ([`release.yml`](.github/workflows/release.yml)). Los programas de terceros (ffmpeg, adb, el driver
-  del monitor virtual) se incluyen tal como los publica su autor.
-- **Roles:** autor, revisor y aprobador: [Alex Pérez Argomedo](https://github.com/AlexPerez7)
-  (único mantenedor). Cada firma de un release se aprueba manualmente.
-- **Privacidad:** NexScreen no transfiere información a otros sistemas en red, salvo la consulta de
-  actualizaciones a GitHub, que puedes desactivar. Ver la [política de privacidad](PRIVACY.md).
+- **What is signed:** the installer `NexScreen-Setup-X.Y.Z.exe` and the NexScreen executables it
+  contains, built by GitHub Actions from this repository's source code
+  ([`release.yml`](.github/workflows/release.yml)). Third-party programs (ffmpeg, adb, the virtual
+  display driver) are included as published by their authors.
+- **Roles:** author, reviewer and approver: [Alex Pérez Argomedo](https://github.com/AlexPerez7)
+  (sole maintainer). Every release signing request is approved manually.
+- **Privacy:** NexScreen does not transfer any information to other networked systems, except the
+  update check against GitHub, which you can turn off. See the [privacy policy](PRIVACY.md).

@@ -1,36 +1,40 @@
-# Política de privacidad de NexScreen
+# NexScreen privacy policy
 
-NexScreen no recopila, vende ni envía datos personales, y no incluye analítica, publicidad ni
-informes de errores.
+[Español](PRIVACY.es.md)
 
-## Conexiones a internet
+NexScreen does not collect, sell or send personal data, and it includes no analytics, advertising
+or crash reporting.
 
-La única conexión a internet que hace NexScreen es la **búsqueda de actualizaciones**:
+## Internet connections
 
-- **Qué hace:** la app de bandeja consulta `https://api.github.com/repos/AlexPerez7/NexScreen/releases/latest`
-  al minuto de iniciar y luego cada 24 horas. Si hay una versión nueva, la descarga desde GitHub
-  solo cuando tú eliges "Instalar la versión X.Y.Z".
-- **Qué se envía:** una consulta HTTPS normal a GitHub (con la versión de NexScreen en el
-  `User-Agent`). GitHub puede registrar tu dirección IP según su
-  [política de privacidad](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
-  NexScreen no envía nada más, ni a GitHub ni a otros servidores.
-- **Cómo desactivarla:** en el menú del ícono de la bandeja, desmarca "Buscar actualizaciones
-  automáticamente" (o pon `"checkForUpdates": false` en `%APPDATA%\NexScreen\settings.json`). Con
-  eso NexScreen no hace ninguna conexión a internet.
+The only internet connection NexScreen makes is the **update check**:
 
-## Conexión con tu dispositivo
+- **What it does:** the tray app queries
+  `https://api.github.com/repos/AlexPerez7/NexScreen/releases/latest` one minute after starting
+  and then every 24 hours. If there is a newer version, it downloads it from GitHub only when you
+  choose "Install version X.Y.Z" in the tray menu.
+- **What is sent:** a regular HTTPS request to GitHub (with the NexScreen version in the
+  `User-Agent` header). GitHub may log your IP address according to its
+  [privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
+  NexScreen sends nothing else, neither to GitHub nor to any other server.
+- **How to turn it off:** in the tray icon menu, untick "Buscar actualizaciones automáticamente"
+  (automatic update check), or set `"checkForUpdates": false` in
+  `%APPDATA%\NexScreen\settings.json`. With that off, NexScreen makes no internet connection at
+  all.
 
-El video del escritorio y el táctil viajan solo entre tu PC y tu dispositivo Android, por el cable
-USB o por tu red local. Por WiFi van cifrados (TLS) y solo con dispositivos que emparejaste con el
-PIN. Nada pasa por servidores de terceros.
+## Connection to your device
 
-## Datos que guarda NexScreen en tu PC
+The desktop video and the touch input travel only between your PC and your Android device, over
+the USB cable or your local network. Over WiFi they are encrypted (TLS) and only with devices you
+paired using the PIN. Nothing goes through third-party servers.
 
-- `%APPDATA%\NexScreen\`: preferencias, posición del monitor virtual y la lista de dispositivos
-  emparejados.
-- `%LOCALAPPDATA%\NexScreen\logs\`: registro de la app (no incluye el contenido de la pantalla).
-- El certificado "NexScreen host" en el almacén de certificados de tu usuario, usado para cifrar
-  la conexión WiFi.
+## Data NexScreen stores on your PC
 
-Desinstalar NexScreen quita el programa, el monitor virtual y las reglas del firewall; estos
-datos de usuario puedes borrarlos a mano.
+- `%APPDATA%\NexScreen\`: preferences, the virtual monitor position and the list of paired
+  devices.
+- `%LOCALAPPDATA%\NexScreen\logs\`: the app log (it does not include screen content).
+- The "NexScreen host" certificate in your user certificate store, used to encrypt the WiFi
+  connection.
+
+Uninstalling NexScreen removes the program, the virtual monitor and the firewall rules; you can
+delete this user data by hand.
