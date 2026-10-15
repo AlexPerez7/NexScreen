@@ -52,6 +52,7 @@ host/Directory.Build.props    Versión de NexScreen (única fuente) y configurac
 host/src/NexScreen.Core/      Lógica del host (librería, net8.0-windows)
   Protocol/                   Framing y mensajes (Wire.cs)
   Video/                      ffmpeg (ddagrab + qsv/nvenc/amf/mf/x264) -> FLV -> Annex-B; StreamTuning (fps, bitrate, escala)
+  Video/Native/               Pipeline propio sin ffmpeg: Desktop Duplication -> VideoProcessor -> NVENC o MFT de Media Foundation
   Net/                        StreamServer, ClientSession, VideoStreamer, IStreamObserver (eventos para la UI)
   Display/                    Monitor virtual: API CCD, GDI, DXGI, driver VDD
   Input/                      Táctil y lápiz: mensaje POINTER, traductor de frames, inyección Win32
@@ -271,6 +272,47 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 - En la tablet, `StreamClient` guarda los SPS/PPS: si el decoder falla lo recrea, pide un
   keyframe y descarta cuadros hasta recibirlo (más de 3 fallas en 10 s cortan la conexión).
 
+## Pipeline nativo (sin ffmpeg)
+
+- **Por qué existe:** `ddagrab` de ffmpeg no pasa de ~72 fps ni en una pantalla real de 144 Hz (medido
+  en el PC personal), aunque el dispositivo pida 90 o 120 Hz. El pipeline propio sostiene los fps
+  que pide el dispositivo (90,0 fps con la tablet por USB y movimiento real).
+- **Cadena** (`Video/Native/`): `DesktopCapture` (Desktop Duplication en el adaptador de la
+  pantalla, copia cada imagen a una textura propia, dibuja el cursor como segunda capa y convierte
+  BGRA→NV12 BT.709 con `ID3D11VideoProcessor`, escalando en la GPU si hace falta) →
+  `IGpuEncoder` (`NvencEncoder` para NVIDIA, `MfH264Encoder` para Intel y AMD) →
+  `NativeVideoSource` (un hilo, `FramePacer` y una cola de salida). Es el primer encoder de
+  `AutoEncoders` (`EncoderKind.Native`, `--encoder native`); si falla al arrancar (sin driver,
+  GPU desconocida, HDR) la fuente termina vacía y el streamer sigue con ffmpeg.
+- **Pacing** (`FramePacer`, lógica pura con tests): se manda por una rejilla regular de 1/fps; con
+  la pantalla a 144 Hz y 90 fps se manda lo último que hay en cada turno. Con la pantalla quieta se
+  repite el último cuadro cada 250 ms; por eso la bandeja marca menos fps con el escritorio quieto
+  (ffmpeg duplicaba cuadros). Si la cola de salida tiene más de 3 cuadros no se codifica (la red no
+  da abasto): así no se acumula atraso ni se rompe la cadena de referencias.
+- **Keyframe y bitrate en marcha:** `IVideoSource.SupportsLiveControl`. `VideoStreamer` no
+  reemplaza la captura con la fuente nativa: `RequestKeyframe()` y el bitrate de `BitrateController`
+  llegan directo al encoder (NVENC: `NvEncReconfigureEncoder`; MFT: `ICodecAPI`).
+- **NVENC directo** (`NvEncApi.cs`, `NvencEncoder.cs`): `nvEncodeAPI64.dll` por punteros a funciones,
+  API 11.1 (drivers desde la serie 470). Las estructuras no se declaran como structs: se arman en
+  memoria con los desplazamientos de `nvEncodeAPI.h` 11.1 (x64). **Hay que poner en cero la
+  estructura entera antes de usarla** (NVENC rechaza el mapeo con `INVALID_PARAM` si los campos
+  reservados traen basura). Preset P1 + `ULTRA_LOW_LATENCY`, CBR, sin B-frames, perfil Main, GOP de
+  2 s, SPS/PPS en cada IDR y VUI BT.709 limitado. Las texturas NV12 se crean solo con `RenderTarget`.
+- **Media Foundation** (`MfH264Encoder.cs`): el MFT de hardware se elige por el nombre del
+  fabricante (los activadores no informan el adaptador). Es asíncrono: los eventos llegan por callback
+  a una cola. **El MFT de NVIDIA falla al activarse (`E_UNEXPECTED`) en el PC personal**, por eso
+  NVIDIA usa NVENC directo. El MFT de Intel no escribe la matriz de color en el VUI (sí el rango).
+- **Sin probar:** AMD (MFT de AMF), HDR, rotación de pantalla, sesión bloqueada con la captura
+  nativa, colores en la tablet con el MFT de Intel.
+- **Medir fps de verdad:** hace falta contenido que cambie a la frecuencia de la pantalla. Una
+  ventana de WinForms/GDI solo llega a ~63 fps y falsea la medición; hay que pintar con D3D11 y
+  `Present(1)`. Desde Bash, pasar `\\.\DISPLAYn` a un exe lo deja mal escapado: lanzarlo desde la
+  herramienta PowerShell. Para ver la tablet: `adb exec-out screencap -p > x.png` **desde Bash**
+  (PowerShell 5 corrompe la redirección binaria).
+- **Probar con `fake_client.py` con la tablet enchufada:** la tablet se reconecta sola y le quita la
+  sesión. Antes `adb reverse --remove-all`, y al terminar `adb reverse tcp:27190 tcp:27190` y
+  abrir la app en la tablet.
+
 ## Ajustes según el dispositivo y la GPU
 
 - **Captura en la GPU correcta:** `DxgiOutputs` recorre todos los adaptadores (no solo el 0). Cada
@@ -278,7 +320,8 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
   `-init_hw_device d3d11va=nexscreen:<adaptador> -filter_hw_device nexscreen` y ddagrab va en
   `-filter_complex` (así recibe ese dispositivo: el log en verbose dice "Using provided hw_device_ctx").
   `--monitor n` es el índice global de `--list-displays`.
-- **Encoder automático** (`FfmpegVideoSource.AutoEncoders`): el del fabricante de esa GPU
+- **Encoder automático** (`FfmpegVideoSource.AutoEncoders`): primero el pipeline nativo; si no
+  puede, el de ffmpeg del fabricante de esa GPU
   (Quick Sync / NVENC / AMF), luego `h264_mf` por GPU (`-hw_encoding 1`, cualquier fabricante),
   luego por CPU y x264. NVENC, AMF y MF por GPU reciben la textura de ddagrab directa si la
   pantalla entra en el dispositivo (siempre en modo extendido); si no, escalan por CPU.

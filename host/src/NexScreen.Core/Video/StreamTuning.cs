@@ -30,6 +30,16 @@ internal static class StreamTuning
         requested ?? (clientRefreshRate > 0 ? Math.Clamp(clientRefreshRate, MinAutoFps, MaxAutoFps) : ReferenceFps);
 
     /// <summary>
+    /// Tamaño al que se transmite una pantalla: el suyo, achicado (nunca agrandado) para entrar en el
+    /// máximo del dispositivo manteniendo el aspecto, y con lados pares como exige H.264 en NV12.
+    /// </summary>
+    public static (int Width, int Height) FitSize(int width, int height, int maxWidth, int maxHeight)
+    {
+        var factor = Math.Min(1.0, Math.Min((double)maxWidth / width, (double)maxHeight / height));
+        return ((int)(width * factor) / 2 * 2, (int)(height * factor) / 2 * 2);
+    }
+
+    /// <summary>
     /// Escala el bitrate de referencia a la resolución y los fps del dispositivo. Los píxeles cuentan
     /// completos; los fps, con raíz cuadrada: a más cuadros por segundo, menos cambia cada uno.
     /// </summary>

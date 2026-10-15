@@ -4,6 +4,8 @@
        La usan la app de bandeja (NexScreen.Tray) y la consola de desarrollo (NexScreen.Host). -->
   <PropertyGroup>
     <RootNamespace>NexScreen.Core</RootNamespace>
+    <!-- NVENC se usa por punteros a funciones de la API nativa (Video/Native/NvEncApi.cs). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +17,8 @@
 
   <ItemGroup>
     <PackageReference Include="Vortice.DXGI" Version="3.8.3" />
+    <PackageReference Include="Vortice.Direct3D11" Version="3.8.3" />
+    <PackageReference Include="Vortice.MediaFoundation" Version="3.8.3" />
   </ItemGroup>
 
 </Project>

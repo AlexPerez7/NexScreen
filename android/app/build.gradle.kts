@@ -13,9 +13,9 @@ android {
         applicationId = "dev.nexscreen.client"
         minSdk = 26
         targetSdk = 35
-        // El workflow de release pasa la versión del tag (-PversionName=0.6.0); versionCode se deriva
+        // El workflow de release pasa la versión del tag (-PversionName=0.7.0); versionCode se deriva
         // de ella para que cada versión nueva sea mayor y el host pueda actualizar la app.
-        versionName = (project.findProperty("versionName") as String?) ?: "0.6.0"
+        versionName = (project.findProperty("versionName") as String?) ?: "0.7.0"
         versionCode = versionCodeOf(versionName!!)
     }
 

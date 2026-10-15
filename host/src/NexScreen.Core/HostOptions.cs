@@ -8,6 +8,9 @@ internal enum EncoderKind
 {
     Auto,
 
+    /// <summary>Captura y codificación propias, sin ffmpeg: NVENC directo (NVIDIA) o Media Foundation (Intel, AMD).</summary>
+    Native,
+
     /// <summary>Intel Quick Sync.</summary>
     Qsv,
 
@@ -51,8 +54,9 @@ internal sealed class HostOptions
                             proporcional a la resolución y los fps del dispositivo). Si la red no
                             da abasto, se baja solo y vuelve a subir cuando la red se recupera
           --fixed-bitrate   No adaptar el bitrate a la red
-          --encoder <e>     auto | qsv | nvenc | amf | mfgpu | mf | x264 (por defecto auto: el de
-                            la GPU de la pantalla, si no Media Foundation por GPU, si no por CPU)
+          --encoder <e>     auto | native | qsv | nvenc | amf | mfgpu | mf | x264 (por defecto auto:
+                            el pipeline propio sin ffmpeg, si no puede el de ffmpeg de la GPU de
+                            la pantalla, si no Media Foundation por GPU, si no por CPU)
           --ffmpeg <ruta>   Ruta a ffmpeg.exe (por defecto se busca en PATH)
           --scale <n>       Escala de Windows para el dispositivo al extender: auto (según la
                             densidad de su pantalla) o 100, 125, 150, 175, 200... (por defecto no se cambia)

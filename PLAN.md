@@ -95,7 +95,15 @@ CLAUDE.md, "Ajustes según el dispositivo y la GPU"). Falta medir si Quick Sync 
 timestamp; en Android `MediaCodec` (Opus) + `AudioTrack` en modo baja latencia. Opción en la
 bandeja (desactivado por defecto). Cuidar la sincronía con el video.
 
-### 7. Pipeline de captura nativo (sin ffmpeg) — L
+### 7. Pipeline de captura nativo (sin ffmpeg) — ✅ hecho
+
+Desktop Duplication directo → VideoProcessor (NV12 en la GPU) → NVENC directo o MFT de Media
+Foundation, con ffmpeg de respaldo (ver CLAUDE.md, "Pipeline nativo"). Sostiene los fps que pide el
+dispositivo (ffmpeg se quedaba en ~72) y atiende keyframe y bitrate sin reemplazar la captura.
+Queda abierto: probar AMD, HDR y la sesión bloqueada; el instalador sigue incluyendo ffmpeg (~95 MB)
+por el respaldo.
+
+<details><summary>Notas originales</summary>
 
 **Qué:** reemplazar el subproceso ffmpeg por captura y codificación dentro del host.
 
@@ -105,6 +113,8 @@ instalador baja de ~95 MB a ~30 MB.
 **Cómo:** Windows.Graphics.Capture o DXGI Desktop Duplication con Vortice, conversión a NV12 en
 GPU (VideoProcessor de D3D11) y codificación con Media Foundation (MFT de hardware de Intel).
 Implementar `IVideoSource` (la interfaz ya existe) y dejar ffmpeg como respaldo.
+
+</details>
 
 ### 8. Varias tablets a la vez — L
 

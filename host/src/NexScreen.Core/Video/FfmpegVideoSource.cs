@@ -51,12 +51,13 @@ internal sealed class FfmpegVideoSource : IVideoSource
     /// </summary>
     public static EncoderKind[] AutoEncoders(GpuVendor vendor)
     {
+        // Primero el pipeline propio (sin el tope de ~72 fps de ddagrab); si no puede, ffmpeg.
         EncoderKind[] fallback = [EncoderKind.MfGpu, EncoderKind.Mf, EncoderKind.X264];
         return vendor switch
         {
-            GpuVendor.Intel => [EncoderKind.Qsv, .. fallback],
-            GpuVendor.Nvidia => [EncoderKind.Nvenc, .. fallback],
-            GpuVendor.Amd => [EncoderKind.Amf, .. fallback],
+            GpuVendor.Intel => [EncoderKind.Native, EncoderKind.Qsv, .. fallback],
+            GpuVendor.Nvidia => [EncoderKind.Native, EncoderKind.Nvenc, .. fallback],
+            GpuVendor.Amd => [EncoderKind.Native, EncoderKind.Amf, .. fallback],
             _ => fallback,
         };
     }

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using NexScreen.Core.Display;
 using NexScreen.Core.Protocol;
 using NexScreen.Core.Video;
+using NexScreen.Core.Video.Native;
 
 namespace NexScreen.Core.Net;
 
@@ -41,6 +42,10 @@ internal sealed class VideoStreamer
     private int _keyframeRequested;
     private TimeSpan? _lastSwitch;
 
+    /// <summary>La fuente en marcha, si atiende keyframes y bitrate sin reiniciarse (la nativa).</summary>
+    private volatile IVideoSource? _live;
+    private long _lastLiveKeyframeTicks;
+
     public VideoStreamer(
         HostOptions options, IStreamObserver observer, MessageChannel channel, Func<CaptureTarget> resolveTarget, StreamFormat format)
     {
@@ -55,7 +60,20 @@ internal sealed class VideoStreamer
     private int CurrentBitrate => _bitrate?.CurrentMbps ?? _format.MaxBitrateMbps;
 
     /// <summary>La tablet no puede seguir decodificando: mandarle un keyframe. Se puede llamar desde cualquier hilo.</summary>
-    public void RequestKeyframe() => Interlocked.Exchange(ref _keyframeRequested, 1);
+    public void RequestKeyframe()
+    {
+        Interlocked.Exchange(ref _keyframeRequested, 1);
+        if (_live is not { } live) return;
+
+        // La fuente nativa lo atiende ya mismo, aunque la pantalla esté quieta y no pasen cuadros.
+        var now = _clock.Elapsed.Ticks;
+        if (now - Interlocked.Read(ref _lastLiveKeyframeTicks) < MinKeyframeInterval.Ticks) return;
+
+        Interlocked.Exchange(ref _lastLiveKeyframeTicks, now);
+        Interlocked.Exchange(ref _keyframeRequested, 0);
+        Log.Info("El dispositivo pidió un keyframe");
+        live.RequestKeyFrame();
+    }
 
     /// <summary>
     /// Mantiene la captura viva. Si nunca produjo video prueba el siguiente encoder; si se cortó
@@ -144,7 +162,9 @@ internal sealed class VideoStreamer
     }
 
     private RunningSource StartSource(VideoSourceSettings settings, CancellationToken ct) =>
-        new(FfmpegVideoSource.Start(_options.FfmpegPath, settings), settings, ct);
+        new(settings.Encoder == EncoderKind.Native
+            ? NativeVideoSource.Start(settings)
+            : FfmpegVideoSource.Start(_options.FfmpegPath, settings), settings, ct);
 
     private static void TryRememberPosition()
     {
@@ -175,6 +195,7 @@ internal sealed class VideoStreamer
     {
         var current = first;
         RunningSource? pending = null;
+        _live = current.Source.SupportsLiveControl ? current.Source : null;
 
         // Al bajar el bitrate por congestión, los cuadros de la captura vieja se descartan hasta que
         // entre la nueva: así la red se vacía en vez de seguir acumulando atraso.
@@ -192,7 +213,16 @@ internal sealed class VideoStreamer
         {
             while (true)
             {
-                if (pending is null && current.Frames > 0 && TakeSwitch(ref requestedBitrate, current.Settings.BitrateMbps, out var bitrate, out var drop))
+                if (current.Source.SupportsLiveControl)
+                {
+                    // La fuente nativa cambia el bitrate en marcha: no hace falta reemplazar la captura.
+                    if (requestedBitrate is { } liveBitrate)
+                    {
+                        requestedBitrate = null;
+                        current.Source.SetBitrate(liveBitrate);
+                    }
+                }
+                else if (pending is null && current.Frames > 0 && TakeSwitch(ref requestedBitrate, current.Settings.BitrateMbps, out var bitrate, out var drop))
                 {
                     pending = StartSource(Settings(current.Settings.Encoder, bitrate), ct);
                     dropping = drop;
@@ -217,6 +247,7 @@ internal sealed class VideoStreamer
                         await current.DisposeAsync().ConfigureAwait(false);
                         current = pending;
                         pending = null;
+                        _live = current.Source.SupportsLiveControl ? current.Source : null;
                         Interlocked.Exchange(ref _keyframeRequested, 0);
                         var ms = (_clock.Elapsed - switchStarted).TotalMilliseconds;
                         Log.Debug($"Captura reemplazada en {ms:F0} ms ({dropped} cuadros descartados)");
@@ -281,6 +312,7 @@ internal sealed class VideoStreamer
         }
         finally
         {
+            _live = null;
             if (pending is not null) await pending.DisposeAsync().ConfigureAwait(false);
         }
 

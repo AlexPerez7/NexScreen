@@ -3,6 +3,22 @@
 Lo nuevo de cada versión de NexScreen. Cada release de GitHub muestra la sección de su versión
 (ver `scripts/release-notes.ps1`): **agregar la sección antes de crear el tag**.
 
+## [0.7.0] - 2026-10-15
+
+### Novedades
+
+- **Más fluidez: los 90 y 120 fps del dispositivo, de verdad.** NexScreen captura y codifica el
+  video por su cuenta, sin ffmpeg, y sostiene la frecuencia de la pantalla del dispositivo (90 fps
+  estables con la Galaxy Tab S9 FE por USB; antes se quedaba en ~70 aunque la pantalla pidiera 90).
+  Funciona con NVIDIA (NVENC) e Intel (Quick Sync); si algo no está disponible, sigue con ffmpeg como
+  hasta ahora.
+
+### Mejoras
+
+- El keyframe que pide el dispositivo y los cambios de bitrate por la red se aplican al instante,
+  sin reiniciar la captura.
+- Con el escritorio quieto, la bandeja muestra menos fps (ya no se repiten cuadros iguales).
+
 ## [0.6.0] - 2026-10-15
 
 ### Novedades

@@ -21,4 +21,18 @@ internal interface IVideoSource : IAsyncDisposable
 
     /// <summary>Últimas líneas de diagnóstico, para reportar por qué falló la fuente.</summary>
     string Diagnostics { get; }
+
+    /// <summary>
+    /// La fuente puede pedir un keyframe y cambiar el bitrate sin reiniciarse. ffmpeg no puede: ahí
+    /// el streamer reemplaza la captura en caliente.
+    /// </summary>
+    bool SupportsLiveControl => false;
+
+    void RequestKeyFrame()
+    {
+    }
+
+    void SetBitrate(int mbps)
+    {
+    }
 }

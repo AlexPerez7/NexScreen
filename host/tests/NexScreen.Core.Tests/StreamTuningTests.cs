@@ -127,13 +127,21 @@ public class FfmpegArgumentsTests
     [InlineData("Intel", "Qsv")]
     [InlineData("Nvidia", "Nvenc")]
     [InlineData("Amd", "Amf")]
-    [InlineData("Unknown", "MfGpu")]
-    public void PrefersTheEncoderOfTheDisplaysGpu(string vendor, string first)
+    public void PrefersTheNativePipelineAndThenTheFfmpegEncoderOfTheDisplaysGpu(string vendor, string ffmpegEncoder)
     {
         var encoders = FfmpegVideoSource.AutoEncoders(Enum.Parse<GpuVendor>(vendor));
 
-        Assert.Equal(Enum.Parse<EncoderKind>(first), encoders[0]);
+        Assert.Equal(EncoderKind.Native, encoders[0]);
+        Assert.Equal(Enum.Parse<EncoderKind>(ffmpegEncoder), encoders[1]);
         Assert.Equal([EncoderKind.MfGpu, EncoderKind.Mf, EncoderKind.X264], encoders[^3..]);
+    }
+
+    [Fact]
+    public void WithoutAKnownGpuVendorItGoesStraightToFfmpeg()
+    {
+        var encoders = FfmpegVideoSource.AutoEncoders(GpuVendor.Unknown);
+
+        Assert.Equal([EncoderKind.MfGpu, EncoderKind.Mf, EncoderKind.X264], encoders);
     }
 
     [Theory]
