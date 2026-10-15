@@ -12,6 +12,10 @@
     <SatelliteResourceLanguages>es</SatelliteResourceLanguages>
     <Company>NexScreen</Company>
     <Product>NexScreen</Product>
+    <Copyright>Copyright (c) 2026 Alex Pérez Argomedo</Copyright>
+    <!-- Sin el hash del commit: todos los binarios de un release llevan exactamente la misma versión
+         (SignPath exige un nombre y una versión de producto coherentes). -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
 </Project>

@@ -224,3 +224,19 @@ Lo próximo, en orden de prioridad (detalle técnico en [PLAN.md](PLAN.md)):
 
 NexScreen se distribuye bajo la [licencia MIT](LICENSE). Los componentes de terceros mantienen
 sus propias licencias (ver [installer/THIRD-PARTY-NOTICES.md](installer/THIRD-PARTY-NOTICES.md)).
+
+## Política de firma de código
+
+Free code signing provided by [SignPath.io](https://signpath.io), certificate by
+[SignPath Foundation](https://signpath.org).
+
+*(En trámite: el instalador de Windows se firmará cuando SignPath Foundation apruebe el proyecto.)*
+
+- **Qué se firma:** el instalador `NexScreen-Setup-X.Y.Z.exe` y los ejecutables de NexScreen que
+  incluye, compilados por GitHub Actions desde el código de este repositorio
+  ([`release.yml`](.github/workflows/release.yml)). Los programas de terceros (ffmpeg, adb, el driver
+  del monitor virtual) se incluyen tal como los publica su autor.
+- **Roles:** autor, revisor y aprobador: [Alex Pérez Argomedo](https://github.com/AlexPerez7)
+  (único mantenedor). Cada firma de un release se aprueba manualmente.
+- **Privacidad:** NexScreen no transfiere información a otros sistemas en red, salvo la consulta de
+  actualizaciones a GitHub, que puedes desactivar. Ver la [política de privacidad](PRIVACY.md).

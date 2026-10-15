@@ -56,6 +56,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
     private bool _updating;
     private Action? _balloonClick;
     private PairingForm? _pairingForm;
+    private CancellationTokenSource? _autoUpdateCts;
 
     public TrayContext()
     {
@@ -91,6 +92,11 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         menu.Items.Add(_startWithWindows);
         menu.Items.Add(new ToolStripMenuItem("Abrir el registro", null, (_, _) => OpenLog()));
         menu.Items.Add(new ToolStripMenuItem($"Buscar actualizaciones (versión {AppVersion})", null, async (_, _) => await CheckForUpdateAsync(manual: true)));
+        menu.Items.Add(new ToolStripMenuItem("Buscar actualizaciones automáticamente", null, (s, _) => ToggleAutoUpdates((ToolStripMenuItem)s!))
+        {
+            Checked = _settings.CheckForUpdates,
+            ToolTipText = "Consulta GitHub una vez al día. Es la única conexión a internet de NexScreen.",
+        });
         _installUpdate.Click += async (_, _) => await InstallUpdateAsync();
         menu.Items.Add(_installUpdate);
         menu.Items.Add(new ToolStripSeparator());
@@ -102,7 +108,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         SetState(TrayState.Waiting, "Iniciando…");
 
         _ = StartServerAsync();
-        if (_settings.CheckForUpdates) _ = CheckForUpdatesPeriodicallyAsync();
+        if (_settings.CheckForUpdates) StartAutoUpdates();
     }
 
     // ---- Menú ----
@@ -335,15 +341,38 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
 
     // ---- Actualizaciones ----
 
-    private async Task CheckForUpdatesPeriodicallyAsync()
+    private void StartAutoUpdates()
+    {
+        _autoUpdateCts = CancellationTokenSource.CreateLinkedTokenSource(_appCts.Token);
+        _ = CheckForUpdatesPeriodicallyAsync(_autoUpdateCts.Token);
+    }
+
+    private void ToggleAutoUpdates(ToolStripMenuItem item)
+    {
+        _settings.CheckForUpdates = !_settings.CheckForUpdates;
+        _settings.Save();
+        item.Checked = _settings.CheckForUpdates;
+        if (_settings.CheckForUpdates)
+        {
+            StartAutoUpdates();
+        }
+        else
+        {
+            _autoUpdateCts?.Cancel();
+            _autoUpdateCts = null;
+        }
+        Log.Info($"Búsqueda automática de actualizaciones: {(_settings.CheckForUpdates ? "activada" : "desactivada")}");
+    }
+
+    private async Task CheckForUpdatesPeriodicallyAsync(CancellationToken token)
     {
         try
         {
-            await Task.Delay(FirstUpdateCheckDelay, _appCts.Token);
+            await Task.Delay(FirstUpdateCheckDelay, token);
             while (true)
             {
                 await CheckForUpdateAsync(manual: false);
-                await Task.Delay(UpdateCheckInterval, _appCts.Token);
+                await Task.Delay(UpdateCheckInterval, token);
             }
         }
         catch (OperationCanceledException)

@@ -138,6 +138,8 @@ Copy-Item (Get-Pinned 'nefcon') "$app\driver\nefcon.zip"
 Copy-Item scripts\install-virtual-display.ps1, scripts\allow-firewall.ps1 "$app\driver"
 
 Copy-Item "$PSScriptRoot\THIRD-PARTY-NOTICES.md" "$app\licenses"
+Copy-Item "$PSScriptRoot\..\LICENSE" "$app\licenses\NexScreen-LICENSE.txt"
+Copy-Item "$PSScriptRoot\..\PRIVACY.md" "$app\licenses"
 
 Step 'Compilando el instalador'
 $iscc = Find-Iscc

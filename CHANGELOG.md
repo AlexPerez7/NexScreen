@@ -3,6 +3,18 @@
 Lo nuevo de cada versión de NexScreen. Cada release de GitHub muestra la sección de su versión
 (ver `scripts/release-notes.ps1`): **agregar la sección antes de crear el tag**.
 
+## [0.7.1] - sin publicar
+
+### Mejoras
+
+- **Privacidad y transparencia.** El instalador muestra antes de instalar qué cambia en el
+  sistema (monitor virtual, firewall, inicio con Windows) y qué datos usa NexScreen. Hay una
+  [política de privacidad](PRIVACY.md): la única conexión a internet es la búsqueda de
+  actualizaciones en GitHub.
+- Nueva opción en el menú de la bandeja, "Buscar actualizaciones automáticamente", para
+  desactivar esa conexión sin editar archivos.
+- El proyecto tiene licencia MIT.
+
 ## [0.7.0] - 2026-10-15
 
 ### Novedades

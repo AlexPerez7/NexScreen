@@ -1,4 +1,4 @@
-; Instalador de NexScreen (Inno Setup 6). Se compila con installer\build.ps1, que define
+﻿; Instalador de NexScreen (Inno Setup 6). Se compila con installer\build.ps1, que define
 ; AppVersion, SourceDir (carpeta armada con la app, tools, driver y licencias) y OutputDir.
 
 #ifndef AppVersion
@@ -40,6 +40,15 @@ UninstallDisplayName={#AppName}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+; Cambios en el sistema y privacidad, antes de instalar (requisito de SignPath Foundation).
+InfoBeforeFile=informacion.txt
+; Metadatos del instalador: mismo nombre de producto y versión que los binarios.
+VersionInfoVersion={#AppVersion}
+VersionInfoProductName={#AppName}
+VersionInfoProductVersion={#AppVersion}
+VersionInfoCompany=NexScreen
+VersionInfoDescription=Instalador de NexScreen
+VersionInfoCopyright=Copyright (c) 2026 Alex Pérez Argomedo
 ; Cierra NexScreen si está abierto al actualizar o desinstalar.
 CloseApplications=force
 RestartApplications=no

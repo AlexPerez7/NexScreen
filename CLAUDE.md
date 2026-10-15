@@ -196,6 +196,18 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
   `installer\build.ps1 -Apk <APK firmado> -Version X.Y.Z` (en PowerShell, `'-PversionName=X.Y.Z'`
   va entre comillas al llamar a gradlew).
 
+## Firma del instalador (SignPath Foundation)
+
+- Requisitos de SignPath Foundation (signpath.org/terms) ya cubiertos en el repo: licencia MIT,
+  `PRIVACY.md`, sección "Política de firma de código" del README (con la atribución obligatoria),
+  `installer\informacion.txt` (cambios en el sistema y privacidad, se muestra antes de instalar),
+  opción "Buscar actualizaciones automáticamente" en la bandeja, y nombre/versión de producto
+  iguales en todos los binarios (`Directory.Build.props` sin hash de commit, `VersionInfo*` del .iss).
+- **La única conexión a internet es la consulta de actualizaciones a GitHub.** Si se agrega otra
+  (telemetría, etc.) hay que declararla en `PRIVACY.md` e `informacion.txt` y poder desactivarla.
+- Falta, tras la aprobación: integrar `signpath/github-action-submit-signing-request` en `release.yml`.
+- Todos los miembros deben tener autenticación en dos pasos (GitHub y SignPath).
+
 ## Releases (fase 4f)
 
 - **Antes de publicar, agregar la sección `## [X.Y.Z] - fecha` en `CHANGELOG.md`** con los cambios

@@ -1,0 +1,23 @@
+﻿Antes de instalar, esto es lo que hace NexScreen en tu PC:
+
+CAMBIOS EN EL SISTEMA
+- Copia el programa en la carpeta de instalación (incluye adb y ffmpeg, sin modificar).
+- Monitor virtual (opcional): instala el Virtual Display Driver, un controlador firmado de
+  código abierto, para usar el dispositivo como monitor extendido.
+- Firewall (opcional): crea reglas "NexScreen" (TCP 27190) y "NexScreen (descubrimiento)" (UDP
+  27191) solo para redes privadas, para conectar por WiFi.
+- Al abrirlo por primera vez, NexScreen se configura para iniciar con Windows (puedes
+  desactivarlo en el menú del ícono de la bandeja) y crea un certificado "NexScreen host" en el
+  almacén de tu usuario para cifrar la conexión WiFi.
+- Desinstalar NexScreen quita el programa, el monitor virtual y las reglas del firewall.
+
+PRIVACIDAD
+- NexScreen no recopila ni envía datos personales, ni incluye analítica o publicidad.
+- La única conexión a internet es la búsqueda de actualizaciones: consulta GitHub
+  (api.github.com) al iniciar y cada 24 horas. GitHub puede registrar tu dirección IP.
+- Puedes desactivarla en el menú del ícono de la bandeja, en "Buscar actualizaciones
+  automáticamente". Con eso NexScreen no hace ninguna conexión a internet.
+- El video y el táctil viajan solo entre tu PC y tu dispositivo, por USB o por tu red local
+  (cifrados por WiFi).
+
+Política de privacidad completa: https://github.com/AlexPerez7/NexScreen/blob/main/PRIVACY.md
