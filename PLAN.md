@@ -59,13 +59,13 @@ La bandeja busca versiones nuevas en GitHub Releases y las instala con un clic (
 
 ### 4. Licencia del repo y firma del instalador — S
 
-**Qué:** el repo no tiene licencia (nadie puede reutilizar el código legalmente) y el instalador
-no está firmado, así que Windows SmartScreen muestra una advertencia al descargarlo.
+**Licencia: ✅ hecho** (MIT, archivo `LICENSE`).
 
-**Cómo:**
-- Elegir licencia (MIT es compatible con todo lo incluido: ffmpeg LGPL, driver MIT, nefcon MIT).
-- Con una licencia OSI, SignPath Foundation firma gratis proyectos open source (la misma que firma
-  el Virtual Display Driver). Integrarlo en `release.yml`.
+**Firma pendiente:** el instalador no está firmado, así que Windows SmartScreen muestra una
+advertencia al descargarlo.
+
+**Cómo:** SignPath Foundation firma gratis proyectos open source (la misma que firma el Virtual
+Display Driver). Solicitar el alta con el repo y la licencia MIT, e integrarlo en `release.yml`.
 
 ### 5. 90 Hz — ✅ hecho (0.6.0)
 

@@ -33,7 +33,7 @@ hace falta cuenta, servidor ni configuración: enchufas la tablet y funciona.
 | ✍️ **Táctil y lápiz** | Tocar es clic, dos dedos desplazan y hacen zoom. El S Pen llega a Windows como un lápiz de verdad: presión, inclinación, botón lateral y rechazo de palma. |
 | 🔌 **USB sin configurar** | Al enchufar la tablet, NexScreen instala la app, la abre y se conecta. También la actualiza cuando hay una versión nueva. |
 | 📶 **WiFi seguro** | La tablet encuentra el PC en la red. Todo el tráfico va cifrado (TLS) y cada tablet se empareja una vez con un código de 6 dígitos. |
-| ⚡ **Baja latencia** | Captura con Desktop Duplication y H.264 por hardware con la GPU que tengas (Intel Quick Sync, NVIDIA NVENC, AMD AMF o Media Foundation), decodificación por hardware en el dispositivo. Hasta 120 fps si la pantalla lo admite. |
+| ⚡ **Baja latencia** | Pipeline propio sin ffmpeg: Desktop Duplication, conversión en la GPU y H.264 por hardware (NVIDIA NVENC directo; Intel Quick Sync y AMD por Media Foundation), con decodificación por hardware en el dispositivo. Sostiene los 90 fps de la tablet de desarrollo y llega hasta 120 fps si la pantalla lo admite. ffmpeg queda como respaldo. |
 | 📉 **Se adapta a la red** | Si el WiFi se congestiona, baja la calidad en vez de acumular atraso y la recupera sola. Si la imagen se daña, la tablet pide una completa y se recupera en menos de un segundo. |
 | 🔄 **Se mantiene solo** | Ícono en la bandeja, inicio con Windows y actualizaciones automáticas desde GitHub. |
 
@@ -204,10 +204,11 @@ Lo próximo, en orden de prioridad (detalle técnico en [PLAN.md](PLAN.md)):
 - [x] Monitor extendido, táctil y S Pen, USB y WiFi
 - [x] Instalador, actualizaciones automáticas, WiFi cifrado con emparejamiento
 - [x] Calidad adaptativa a la red y recuperación de errores de video
-- [ ] Licencia y firma del instalador
-- [ ] 90 Hz
+- [x] Licencia MIT
+- [ ] Firma del instalador
+- [x] 90 Hz y más
 - [ ] Audio del PC en la tablet
-- [ ] Captura y codificación nativas (menos latencia, instalador más chico)
+- [x] Captura y codificación nativas (menos latencia)
 - [ ] Varias tablets a la vez
 
 ## Créditos
@@ -221,5 +222,5 @@ Lo próximo, en orden de prioridad (detalle técnico en [PLAN.md](PLAN.md)):
 
 ## Licencia
 
-Este proyecto todavía no tiene licencia: el código es visible, pero no se otorga permiso para
-reutilizarlo. Los componentes de terceros mantienen sus propias licencias.
+NexScreen se distribuye bajo la [licencia MIT](LICENSE). Los componentes de terceros mantienen
+sus propias licencias (ver [installer/THIRD-PARTY-NOTICES.md](installer/THIRD-PARTY-NOTICES.md)).

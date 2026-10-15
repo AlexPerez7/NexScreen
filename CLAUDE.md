@@ -39,7 +39,7 @@ El proyecto se trabaja en dos PCs. Los datos de uno no valen para el otro.
 |---|---|---|
 | CPU / GPU | i7-13620H, solo Intel UHD (Quick Sync) | i5-13420H, Intel UHD + NVIDIA RTX 4060 Laptop (NVENC) |
 | Red WiFi | "Fenita_5G", PC 192.168.1.88, tablet 192.168.1.87 (red Privada desde el 2026-10-14) | "Universidad Catolica 5G", PC 192.168.100.24 (perfil Público el 2026-10-15) |
-| NexScreen instalado | 0.4.1 local, se actualiza solo | No |
+| NexScreen instalado | 0.4.1 local, se actualiza solo | 0.7.0 (el 2026-10-15; NVENC nativo probado con la tablet por USB) |
 | Clave de firma del APK | Sí | No |
 | Herramientas | Android Studio y SDK | .NET SDK 8, Inno Setup, platform-tools y Android Studio instalados con winget el 2026-10-15; el SDK de Android y el firewall/driver del monitor virtual faltan |
 
@@ -190,8 +190,8 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
   quedó apuntando a otro exe (por ejemplo, el de desarrollo).
 - Instalado en `C:\Program Files\NexScreen`. Log del driver: `C:\ProgramData\NexScreen\install-virtual-display.log`.
   Desinstalar quita también las reglas del firewall y el monitor virtual.
-- **En el PC del usuario hay un NexScreen instalado** (0.4.1, compilación local con el
-  actualizador; se actualiza solo desde la 0.5.0): para probar cambios del código hay que cerrar
+- **En los PCs del usuario hay un NexScreen instalado** (trabajo: 0.4.1, compilación local con el
+  actualizador, se actualiza solo desde la 0.5.0; personal: 0.7.0, ver "Equipos del usuario"): para probar cambios del código hay que cerrar
   el NexScreen instalado (usa el mismo puerto). Para armar un instalador local:
   `installer\build.ps1 -Apk <APK firmado> -Version X.Y.Z` (en PowerShell, `'-PversionName=X.Y.Z'`
   va entre comillas al llamar a gradlew).
@@ -350,5 +350,5 @@ Al cambiar el protocolo hay que actualizar **siempre los cuatro lugares**:
 - Las funciones de Windows que dependen del hardware se aíslan para poder testear la lógica sin él
   (p. ej. `VirtualDisplay.ComputePosition` recibe la lista de pantallas).
 - Commits en español, con un resumen de la fase o del cambio y el detalle en viñetas.
-- Repo público: https://github.com/AlexPerez7/NexScreen (rama `main`, sin licencia por ahora).
+- Repo público: https://github.com/AlexPerez7/NexScreen (rama `main`, licencia MIT).
   No commitear `local.properties`, binarios ni capturas.
