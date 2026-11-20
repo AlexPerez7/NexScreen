@@ -160,11 +160,15 @@ internal sealed class HostOptions
         return options;
     }
 
-    /// <summary>Convierte <see cref="ScreenMode.Auto"/> en extend o mirror según haya monitor virtual.</summary>
-    public void ResolveMode(bool virtualDisplayAvailable)
-    {
-        if (Mode == ScreenMode.Auto) Mode = virtualDisplayAvailable ? ScreenMode.Extend : ScreenMode.Mirror;
-    }
+    /// <summary>
+    /// Modo efectivo: <see cref="ScreenMode.Auto"/> es extend si hay monitor virtual y mirror si no.
+    /// No modifica <see cref="Mode"/>: se reevalúa en cada conexión, porque el driver puede aparecer
+    /// o caerse mientras el host sigue abierto.
+    /// </summary>
+    public ScreenMode ResolveMode(bool virtualDisplayAvailable) =>
+        Mode == ScreenMode.Auto
+            ? (virtualDisplayAvailable ? ScreenMode.Extend : ScreenMode.Mirror)
+            : Mode;
 
     private static string NextValue(IReadOnlyList<string> args, ref int i)
     {

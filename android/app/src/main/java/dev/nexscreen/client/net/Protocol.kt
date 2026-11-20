@@ -19,6 +19,8 @@ object Protocol {
 
     /** JSON con la pantalla del dispositivo: width, height, dpi y refreshRate (ver docs/protocol.md). */
     const val TYPE_HELLO = 0x01
+
+    /** JSON del host con codec, maxWidth, maxHeight y fps; opcional `notice` (texto para el usuario). */
     const val TYPE_CONFIG = 0x02
     const val TYPE_PAIR_REQUIRED = 0x03
     const val TYPE_PAIR = 0x04

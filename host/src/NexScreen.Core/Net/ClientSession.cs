@@ -35,17 +35,20 @@ internal sealed class ClientSession
         var bitrate = _options.ScaleBitrate
             ? StreamTuning.ScaleBitrate(_options.BitrateMbps, maxWidth, maxHeight, fps)
             : _options.BitrateMbps;
+        // Antes del CONFIG: si sale en espejo por culpa del driver, la tablet recibe el aviso.
+        var (extend, notice) = ResolveExtend();
         await channel.WriteJsonAsync(
             MessageType.Config,
-            new ConfigMessage(Wire.Version, "h264", maxWidth, maxHeight, fps),
+            new ConfigMessage(Wire.Version, "h264", maxWidth, maxHeight, fps, notice),
             ct).ConfigureAwait(false);
 
         _observer.OnClientConnected(hello.Device, maxWidth, maxHeight);
 
-        var extend = _options.Mode == ScreenMode.Extend;
         Func<CaptureTarget> resolveTarget = () => DxgiOutputs.ByIndex(_options.Monitor);
         if (extend)
         {
+            // Si el monitor virtual quedó en el escritorio (sesión anterior mal cerrada o agregado a mano), partir limpio.
+            DetachVirtualDisplay(rememberPosition: false);
             // El monitor virtual toma la resolución y la frecuencia nativas del dispositivo: no hay escalado.
             var gdiName = await VirtualDisplay.AttachAsync(maxWidth, maxHeight, fps, _options.Position, ct)
                 .ConfigureAwait(false);
@@ -58,14 +61,45 @@ internal sealed class ClientSession
 
         try
         {
-            await StreamAsync(channel, resolveTarget, new StreamFormat(maxWidth, maxHeight, fps, bitrate), ct)
+            await StreamAsync(channel, resolveTarget, new StreamFormat(maxWidth, maxHeight, fps, bitrate), extend, ct)
                 .ConfigureAwait(false);
         }
         finally
         {
-            if (extend) DetachVirtualDisplay();
+            if (extend) DetachVirtualDisplay(rememberPosition: true);
         }
     }
+
+    /// <summary>
+    /// Decide en esta conexión si se extiende el escritorio. Se hace aquí y no al arrancar el host:
+    /// el driver puede aparecer o caerse mientras el host sigue abierto. Devuelve además el aviso que
+    /// hay que mostrarle al usuario en el dispositivo (null si no hace falta).
+    /// </summary>
+    private (bool Extend, string? Notice) ResolveExtend()
+    {
+        var driver = VirtualDisplayDriver.Check();
+        var mode = _options.ResolveMode(driver == DriverState.Working);
+        if (driver == DriverState.Broken && _options.Mode != ScreenMode.Mirror)
+        {
+            Log.Warn(HostStartup.BrokenDriverMessage);
+            _observer.OnVirtualDisplayUnavailable();
+        }
+
+        if (mode == ScreenMode.Mirror) Log.Info($"Modo espejo: se captura el monitor {_options.Monitor}");
+        return (mode == ScreenMode.Extend, MirrorNotice(driver, _options.Mode));
+    }
+
+    /// <summary>
+    /// Aviso para el dispositivo cuando sale en espejo sin que el usuario lo haya pedido, o null.
+    /// </summary>
+    internal static string? MirrorNotice(DriverState driver, ScreenMode requested) => (driver, requested) switch
+    {
+        (DriverState.Working, _) => null,
+        (_, ScreenMode.Mirror) => null,
+        (DriverState.Broken, _) =>
+            "El monitor virtual no está funcionando: se está espejando la pantalla principal. Repáralo desde el menú de NexScreen en el PC.",
+        _ => "El monitor virtual no está instalado: se está espejando la pantalla principal.",
+    };
 
     private static void ApplyScale(int percent)
     {
@@ -84,11 +118,11 @@ internal sealed class ClientSession
         }
     }
 
-    private static void DetachVirtualDisplay()
+    private static void DetachVirtualDisplay(bool rememberPosition)
     {
         try
         {
-            VirtualDisplay.Detach(rememberPosition: true);
+            VirtualDisplay.Detach(rememberPosition);
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
         {
@@ -96,11 +130,11 @@ internal sealed class ClientSession
         }
     }
 
-    private async Task StreamAsync(MessageChannel channel, Func<CaptureTarget> resolveTarget, StreamFormat format, CancellationToken ct)
+    private async Task StreamAsync(MessageChannel channel, Func<CaptureTarget> resolveTarget, StreamFormat format, bool extended, CancellationToken ct)
     {
         using var sessionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         using var injector = new PointerInjector(CachedScreen(resolveTarget));
-        var streamer = new VideoStreamer(_options, _observer, channel, resolveTarget, format);
+        var streamer = new VideoStreamer(_options, _observer, channel, resolveTarget, format, extended);
         var receive = ReceiveLoopAsync(channel, injector, streamer, sessionCts.Token);
         var video = streamer.RunAsync(sessionCts.Token);
 

@@ -13,6 +13,17 @@
     <string name="connect_usb">Conectar por USB</string>
     <string name="connect_wifi">Conectar por WiFi</string>
     <string name="main_help">USB: con NexScreen abierto en el PC, enchufa este dispositivo y la conexión arranca sola.\nWiFi: el PC y este dispositivo tienen que estar en la misma red.</string>
+    <string name="update_check">Buscar actualizaciones (versión %1$s)</string>
+    <string name="update_checking">Buscando actualizaciones…</string>
+    <string name="update_up_to_date">Tienes la última versión (%1$s).</string>
+    <string name="update_error">No se pudo buscar actualizaciones. Revisa la conexión a internet.</string>
+    <string name="update_available_title">Versión %1$s disponible</string>
+    <string name="update_available_message">Tienes la %1$s. ¿Descargar e instalar la %2$s (%3$s MB)? La app se cierra al actualizarse.</string>
+    <string name="update_install">Instalar</string>
+    <string name="update_later">Ahora no</string>
+    <string name="update_downloading">Descargando la versión %1$s… %2$d %%</string>
+    <string name="update_download_failed">No se pudo descargar la actualización: %1$s</string>
+    <string name="update_allow_install">Activa "Permitir desde esta fuente" y vuelve a NexScreen para terminar de instalar.</string>
     <string name="error_host_required">Ingresa la IP del PC</string>
     <string name="error_port_invalid">Puerto inválido</string>
     <string name="status_connecting">Conectando a %1$s:%2$d…</string>

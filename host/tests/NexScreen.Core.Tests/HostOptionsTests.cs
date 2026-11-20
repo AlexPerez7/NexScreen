@@ -56,9 +56,18 @@ public class HostOptionsTests
     {
         var options = HostOptions.Parse([]);
 
-        options.ResolveMode(available);
+        Assert.Equal(Enum.Parse<ScreenMode>(expected), options.ResolveMode(available));
+    }
 
-        Assert.Equal(Enum.Parse<ScreenMode>(expected), options.Mode);
+    [Fact]
+    public void AutoModeIsReevaluatedOnEveryCall()
+    {
+        var options = HostOptions.Parse([]);
+
+        // El driver estaba caído, vuelve a funcionar y el modo debe pasar a extender sin reiniciar.
+        Assert.Equal(ScreenMode.Mirror, options.ResolveMode(virtualDisplayAvailable: false));
+        Assert.Equal(ScreenMode.Extend, options.ResolveMode(virtualDisplayAvailable: true));
+        Assert.Equal(ScreenMode.Auto, options.Mode);
     }
 
     [Fact]
@@ -66,9 +75,7 @@ public class HostOptionsTests
     {
         var options = HostOptions.Parse(["--mode", "mirror"]);
 
-        options.ResolveMode(virtualDisplayAvailable: true);
-
-        Assert.Equal(ScreenMode.Mirror, options.Mode);
+        Assert.Equal(ScreenMode.Mirror, options.ResolveMode(virtualDisplayAvailable: true));
     }
 
     [Fact]

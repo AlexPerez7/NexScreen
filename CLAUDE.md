@@ -157,6 +157,17 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
 - `ChangeDisplaySettingsEx` **no puede agregar** una pantalla al escritorio (devuelve -1): para
   agregar o quitar se usa `SetDisplayConfig`; CDS solo fija el modo y la posición después.
 - El driver no acepta 0 monitores: "apagar" es quitarlo del escritorio.
+- **Driver caído:** tras una actualización de Windows el dispositivo `ROOT\DISPLAY\0000`
+  (hardware ID `Root\MttVDD`) puede quedar en `Status: Error` sin código de problema, sin adaptador
+  "Virtual Display Driver" y sin el pipe `MTTVirtualDisplayPipe`. `VirtualDisplayDriver.Check()` lo
+  distingue de "no instalado" (dispositivo en el registro pero sin adaptador) y `RepairAsync` lo
+  reinicia con Disable/Enable-PnpDevice elevado (la bandeja no corre como admin).
+- **El modo Auto se resuelve en cada conexión** (`ClientSession.ResolveExtend`), no al arrancar:
+  `HostOptions.ResolveMode` no modifica `Mode`. Con el driver roto avisa por
+  `IStreamObserver.OnVirtualDisplayUnavailable` y la bandeja ofrece "Reparar monitor virtual".
+  La bandeja pregunta (MessageBox, una vez por ejecución; se rearma tras reparar) antes de pedir UAC.
+  Si sale en espejo sin que el usuario lo pidiera, CONFIG lleva `notice` y la app lo muestra en un
+  Toast (`ClientSession.MirrorNotice`; está en los cuatro lugares del protocolo).
 - **Escala (DPI) por monitor:** no hay API pública. Se usa la interna de Configuración →
   Pantalla: `DisplayConfigGet/SetDeviceInfo` con tipos -3/-4 (`DisplayConfig.cs`). Los valores
   son relativos a la escala recomendada por Windows (`DpiScale.cs`). Se aplica antes de capturar.
@@ -203,7 +214,10 @@ host\src\NexScreen.Host\bin\Debug\net8.0-windows\nexscreen-host.exe --list-displ
   `installer\informacion.txt` (cambios en el sistema y privacidad, se muestra antes de instalar),
   opción "Buscar actualizaciones automáticamente" en la bandeja, y nombre/versión de producto
   iguales en todos los binarios (`Directory.Build.props` sin hash de commit, `VersionInfo*` del .iss).
-- **La única conexión a internet es la consulta de actualizaciones a GitHub.** Si se agrega otra
+- **La única conexión a internet es la consulta de actualizaciones a GitHub.** La bandeja la hace
+  sola (desactivable); la app de Android (`net/AppUpdate.kt`) solo cuando el usuario toca "Buscar
+  actualizaciones" y descarga el APK `NexScreen-X.Y.Z.apk` del release, verifica tamaño y SHA-256 e
+  instala con el instalador de Android (FileProvider + `REQUEST_INSTALL_PACKAGES`). Si se agrega otra
   (telemetría, etc.) hay que declararla en `PRIVACY.md` e `informacion.txt` y poder desactivarla.
 - Falta, tras la aprobación: integrar `signpath/github-action-submit-signing-request` en `release.yml`.
 - Todos los miembros deben tener autenticación en dos pasos (GitHub y SignPath).

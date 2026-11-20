@@ -16,7 +16,11 @@ La única conexión a internet que hace NexScreen es la **búsqueda de actualiza
   NexScreen no envía nada más, ni a GitHub ni a otros servidores.
 - **Cómo desactivarla:** en el menú del ícono de la bandeja, desmarca "Buscar actualizaciones
   automáticamente" (o pon `"checkForUpdates": false` en `%APPDATA%\NexScreen\settings.json`). Con
-  eso NexScreen no hace ninguna conexión a internet.
+  eso la app del PC no hace ninguna conexión a internet.
+
+La **app de Android** solo se conecta a internet cuando tocas "Buscar actualizaciones" en su
+pantalla principal: consulta la misma dirección de GitHub y, si aceptas, descarga el APK nuevo
+desde GitHub. Nunca busca por su cuenta, así que no hay nada que desactivar.
 
 ## Conexión con tu dispositivo
 

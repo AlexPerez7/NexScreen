@@ -37,6 +37,20 @@ internal sealed class StreamServer
         _paired = paired ?? new PairedDevices();
     }
 
+    /// <summary>Corta la sesión activa (si hay). El dispositivo puede volver a conectarse enseguida.</summary>
+    public async Task EndSessionAsync()
+    {
+        await _sessionLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await StopSessionAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _sessionLock.Release();
+        }
+    }
+
     public async Task RunAsync(CancellationToken ct)
     {
         var certificate = LoadCertificate();

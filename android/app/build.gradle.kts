@@ -13,9 +13,9 @@ android {
         applicationId = "dev.nexscreen.client"
         minSdk = 26
         targetSdk = 35
-        // El workflow de release pasa la versión del tag (-PversionName=0.7.0); versionCode se deriva
+        // El workflow de release pasa la versión del tag (-PversionName=0.8.0); versionCode se deriva
         // de ella para que cada versión nueva sea mayor y el host pueda actualizar la app.
-        versionName = (project.findProperty("versionName") as String?) ?: "0.7.0"
+        versionName = (project.findProperty("versionName") as String?) ?: "0.8.0"
         versionCode = versionCodeOf(versionName!!)
     }
 
@@ -69,4 +69,6 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
 
     testImplementation("junit:junit:4.13.2")
+    // En los tests unitarios org.json es solo un stub de Android; esta es la implementación real.
+    testImplementation("org.json:json:20240303")
 }

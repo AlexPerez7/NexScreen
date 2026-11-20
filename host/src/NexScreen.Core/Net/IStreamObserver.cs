@@ -25,6 +25,14 @@ internal interface IStreamObserver
 
     /// <summary>Terminó el emparejamiento (con éxito o no): ocultar el PIN.</summary>
     void OnPairingFinished(string device, bool paired);
+
+    /// <summary>
+    /// El driver del monitor virtual está instalado pero no responde: la conexión sale en espejo (o
+    /// falla, si se pidió extender). La interfaz puede ofrecer repararlo.
+    /// </summary>
+    void OnVirtualDisplayUnavailable()
+    {
+    }
 }
 
 internal sealed class NullStreamObserver : IStreamObserver

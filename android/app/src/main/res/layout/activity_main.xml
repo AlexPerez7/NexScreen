@@ -122,6 +122,21 @@
                 android:layout_marginTop="24dp"
                 android:text="@string/main_help"
                 android:textAppearance="?attr/textAppearanceBodySmall" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/checkUpdate"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/update_check" />
+
+            <TextView
+                android:id="@+id/updateStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

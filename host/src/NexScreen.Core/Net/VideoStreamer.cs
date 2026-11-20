@@ -37,6 +37,7 @@ internal sealed class VideoStreamer
     private readonly MessageChannel _channel;
     private readonly Func<CaptureTarget> _resolveTarget;
     private readonly StreamFormat _format;
+    private readonly bool _extended;
     private readonly BitrateController? _bitrate;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private int _keyframeRequested;
@@ -47,13 +48,15 @@ internal sealed class VideoStreamer
     private long _lastLiveKeyframeTicks;
 
     public VideoStreamer(
-        HostOptions options, IStreamObserver observer, MessageChannel channel, Func<CaptureTarget> resolveTarget, StreamFormat format)
+        HostOptions options, IStreamObserver observer, MessageChannel channel, Func<CaptureTarget> resolveTarget, StreamFormat format,
+        bool extended)
     {
         _options = options;
         _observer = observer;
         _channel = channel;
         _resolveTarget = resolveTarget;
         _format = format;
+        _extended = extended;
         _bitrate = options.AdaptiveBitrate ? new BitrateController(format.MaxBitrateMbps) : null;
     }
 
@@ -150,7 +153,7 @@ internal sealed class VideoStreamer
             Log.Warn($"La captura se interrumpió ({FirstLine(result.Diagnostics)}); reiniciando");
             await Task.Delay(RestartDelay, ct).ConfigureAwait(false);
             // La causa más común es que el usuario movió el monitor: guardar dónde lo dejó.
-            if (_options.Mode == ScreenMode.Extend) TryRememberPosition();
+            if (_extended) TryRememberPosition();
         }
     }
 

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace NexScreen.Core.Protocol;
 
@@ -60,8 +61,14 @@ internal enum MessageType : byte
 internal sealed record HelloMessage(
     int Protocol, string Device, int Width, int Height, int Dpi, bool Paired = false, int RefreshRate = 0);
 
-/// <summary>Host → cliente, respuesta al Hello. El tamaño real del video lo informa el decoder.</summary>
-internal sealed record ConfigMessage(int Protocol, string Codec, int MaxWidth, int MaxHeight, int Fps);
+/// <summary>
+/// Host → cliente, respuesta al Hello. El tamaño real del video lo informa el decoder.
+/// <see cref="Notice"/>: aviso opcional para mostrarle al usuario (por ejemplo, por qué la sesión sale en
+/// espejo). Se omite si no hay; las apps anteriores a la 0.6.0 lo ignoran.
+/// </summary>
+internal sealed record ConfigMessage(
+    int Protocol, string Codec, int MaxWidth, int MaxHeight, int Fps,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Notice = null);
 
 /// <summary>Host → tablet: hay que emparejar. <see cref="Host"/> es el nombre del PC.</summary>
 internal sealed record PairRequiredMessage(string Host);

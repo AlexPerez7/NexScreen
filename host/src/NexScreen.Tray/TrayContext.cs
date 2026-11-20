@@ -54,6 +54,8 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
     private readonly ToolStripMenuItem _installUpdate = new() { Visible = false };
     private UpdateRelease? _availableUpdate;
     private bool _updating;
+    private bool _repairing;
+    private bool _repairOffered;
     private Action? _balloonClick;
     private PairingForm? _pairingForm;
     private CancellationTokenSource? _autoUpdateCts;
@@ -88,6 +90,7 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         menu.Items.Add(ScaleMenu());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Abrir NexScreen en el dispositivo (USB)", null, async (_, _) => await ConnectUsbNowAsync()));
+        menu.Items.Add(new ToolStripMenuItem("Reparar monitor virtual", null, async (_, _) => await RepairVirtualDisplayAsync()));
         menu.Items.Add(PairedDevicesMenu());
         menu.Items.Add(_startWithWindows);
         menu.Items.Add(new ToolStripMenuItem("Abrir el registro", null, (_, _) => OpenLog()));
@@ -268,6 +271,25 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
         });
 
         if (_usb is null) StartUsbAutoConnect(options.Port);
+
+        // Si el driver quedó roto (típico tras actualizar Windows), ofrecer repararlo ahora.
+        if (await Task.Run(VirtualDisplayDriver.Check) == DriverState.Broken) OfferRepair();
+    }
+
+    /// <summary>
+    /// Pregunta una vez si se repara el monitor virtual (pide permisos de administrador, por eso no se
+    /// hace sin confirmar). Si el usuario dice que no, las veces siguientes solo se muestra el globo.
+    /// </summary>
+    private void OfferRepair()
+    {
+        if (_repairOffered || _repairing || _exiting) return;
+        _repairOffered = true;
+        var answer = MessageBox.Show(
+            "El monitor virtual de NexScreen no está funcionando (suele pasar después de actualizar Windows), " +
+            "así que el dispositivo no puede extender el escritorio.\n\n" +
+            "¿Quieres repararlo ahora? Windows te pedirá permiso de administrador.",
+            "NexScreen", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1);
+        if (answer == DialogResult.Yes) _ = RepairVirtualDisplayAsync();
     }
 
     private void StartUsbAutoConnect(int port)
@@ -582,6 +604,78 @@ internal sealed class TrayContext : ApplicationContext, IStreamObserver, IUsbObs
             ShowBalloon(5_000, "Dispositivo emparejado", $"{device} ya puede conectarse por WiFi sin código.", ToolTipIcon.Info);
         }
     }, null);
+
+    void IStreamObserver.OnVirtualDisplayUnavailable() => _ui.Post(_ =>
+    {
+        if (!_repairOffered)
+        {
+            OfferRepair();
+            return;
+        }
+
+        ShowBalloon(15_000, "El monitor virtual no funciona",
+            "El driver está instalado pero no responde, así que el dispositivo no puede extender el escritorio. " +
+            "Haz clic aquí para repararlo.",
+            ToolTipIcon.Warning, onClick: () => _ = RepairVirtualDisplayAsync());
+    }, null);
+
+    /// <summary>
+    /// Reinicia el driver del monitor virtual (pide permisos de administrador) y, si había una
+    /// conexión en espejo por su culpa, la corta para que el dispositivo se reconecte ya extendido.
+    /// </summary>
+    private async Task RepairVirtualDisplayAsync()
+    {
+        if (_repairing) return;
+        _repairing = true;
+        try
+        {
+            var state = await Task.Run(VirtualDisplayDriver.Check);
+            if (state == DriverState.Working)
+            {
+                ShowBalloon(5_000, "NexScreen", "El monitor virtual ya funciona; no hace falta repararlo.", ToolTipIcon.Info);
+                return;
+            }
+
+            if (state == DriverState.NotInstalled)
+            {
+                ShowBalloon(10_000, "Falta el monitor virtual",
+                    "El driver no está instalado. Reinstala NexScreen o ejecuta scripts\\install-virtual-display.ps1 como administrador.",
+                    ToolTipIcon.Warning);
+                return;
+            }
+
+            ShowBalloon(8_000, "NexScreen", "Reparando el monitor virtual… acepta el permiso de administrador.", ToolTipIcon.Info);
+            var result = await VirtualDisplayDriver.RepairAsync(_appCts.Token);
+            switch (result)
+            {
+                case RepairResult.Repaired:
+                    _repairOffered = false; // si vuelve a caerse más adelante, se pregunta de nuevo
+                    var server = _server;
+                    var reconnect = server?.HasActiveSession == true;
+                    if (reconnect) await server!.EndSessionAsync();
+                    ShowBalloon(8_000, "Monitor virtual reparado",
+                        reconnect ? "Se cerró la conexión: vuelve a conectar el dispositivo para extender el escritorio."
+                                  : "Ya puedes conectar el dispositivo.",
+                        ToolTipIcon.Info);
+                    break;
+                case RepairResult.Cancelled:
+                    ShowBalloon(5_000, "NexScreen", "Reparación cancelada: hace falta el permiso de administrador.", ToolTipIcon.Warning);
+                    break;
+                default:
+                    ShowBalloon(12_000, "No se pudo reparar el monitor virtual",
+                        "El driver sigue sin responder. Reinicia el PC o reinstala con scripts\\install-virtual-display.ps1 (como administrador).",
+                        ToolTipIcon.Error);
+                    break;
+            }
+        }
+        catch (OperationCanceledException) when (_appCts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            _repairing = false;
+        }
+    }
 
     void IUsbObserver.OnTabletLaunched(string device) => _ui.Post(_ =>
     {

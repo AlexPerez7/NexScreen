@@ -19,8 +19,12 @@ The only internet connection NexScreen makes is the **update check**:
   NexScreen sends nothing else, neither to GitHub nor to any other server.
 - **How to turn it off:** in the tray icon menu, untick "Buscar actualizaciones automáticamente"
   (automatic update check), or set `"checkForUpdates": false` in
-  `%APPDATA%\NexScreen\settings.json`. With that off, NexScreen makes no internet connection at
+  `%APPDATA%\NexScreen\settings.json`. With that off, the PC app makes no internet connection at
   all.
+
+The **Android app** makes an internet connection only when you tap "Buscar actualizaciones" (check
+for updates) on its main screen: it queries the same GitHub address and, if you accept, downloads
+the new APK from GitHub. It never checks by itself, so there is nothing to turn off.
 
 ## Connection to your device
 

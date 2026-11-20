@@ -187,7 +187,10 @@ def main() -> None:
                     raise SystemExit(f"Emparejamiento rechazado: {result.get('error')}")
                 start = time.monotonic()
             elif msg_type == CONFIG:
-                print("CONFIG", json.loads(payload))
+                config = json.loads(payload)
+                print("CONFIG", config)
+                if config.get("notice"):
+                    print("AVISO del host:", config["notice"])
             elif msg_type == VIDEO:
                 pts, flags = struct.unpack(">qB", payload[:9])
                 out.write(payload[9:])

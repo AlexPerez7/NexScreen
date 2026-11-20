@@ -50,6 +50,9 @@ class StreamClient(
         fun onPairingRequired(hostName: String, error: String?)
         fun onPaired(hostName: String)
         fun onConnected()
+
+        /** Aviso del PC para el usuario (campo `notice` de CONFIG), por ejemplo por qué sale en espejo. */
+        fun onNotice(message: String)
         fun onVideoSize(width: Int, height: Int)
         fun onStats(stats: StreamStats)
 
@@ -211,6 +214,9 @@ class StreamClient(
                         decoderFailures.clear()
                         restartDecoder()
                         listener.onConnected()
+                        if (config.has("notice") && !config.isNull("notice")) {
+                            config.getString("notice").takeIf { it.isNotBlank() }?.let(listener::onNotice)
+                        }
                     }
                     Protocol.TYPE_VIDEO -> onVideo(channel, message.payload)
                     Protocol.TYPE_PING -> channel.write(Protocol.TYPE_PONG, message.payload)

@@ -261,6 +261,10 @@ class StreamActivity : AppCompatActivity(), SurfaceHolder.Callback, StreamClient
         binding.status.text = getString(R.string.status_waiting_video)
     }
 
+    override fun onNotice(message: String) = runOnUiThread {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+
     override fun onVideoSize(width: Int, height: Int) = runOnUiThread {
         videoWidth = width
         videoHeight = height

@@ -3,10 +3,27 @@
 Lo nuevo de cada versión de NexScreen. Cada release de GitHub muestra la sección de su versión
 (ver `scripts/release-notes.ps1`): **agregar la sección antes de crear el tag**.
 
-## [0.7.1] - sin publicar
+## [0.8.0] - 2026-11-20
+
+### Novedades
+
+- **La app de Android también busca actualizaciones.** En la pantalla principal, el botón
+  "Buscar actualizaciones" consulta GitHub, descarga la versión nueva y la instala (Android pide
+  permitir la instalación desde NexScreen la primera vez). Solo se conecta a internet cuando tú lo
+  pides. Conectar el dispositivo por USB sigue actualizando la app solo, como hasta ahora.
+- **El monitor virtual se repara con tu permiso.** Si el driver se cae (por ejemplo, tras
+  actualizar Windows), la bandeja lo avisa y pregunta una vez si quieres repararlo; también está
+  la opción "Reparar monitor virtual" en su menú. Pide permiso de administrador y nunca lo hace sin
+  confirmar.
 
 ### Mejoras
 
+- **El monitor virtual se comprueba en cada conexión.** Antes, si el driver estaba caído al abrir
+  NexScreen, el modo "espejo" se quedaba fijo aunque el driver volviera a funcionar y había que
+  reiniciar la bandeja. Ahora se reevalúa al conectar el dispositivo.
+- Si el dispositivo sale en espejo porque el monitor virtual no está disponible, la app lo dice en
+  pantalla ("El monitor virtual no está funcionando: se está espejando la pantalla principal…").
+  Requiere la app 0.8.0 en el dispositivo; con una anterior el aviso solo sale en el PC.
 - **Privacidad y transparencia.** El instalador muestra antes de instalar qué cambia en el
   sistema (monitor virtual, firewall, inicio con Windows) y qué datos usa NexScreen. Hay una
   [política de privacidad](PRIVACY.md): la única conexión a internet es la búsqueda de

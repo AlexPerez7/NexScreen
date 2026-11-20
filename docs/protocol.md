@@ -34,7 +34,7 @@ Enteros en big-endian. Payload máximo: 16 MiB.
 | Tipo | Nombre | Dirección | Payload |
 |------|--------|-----------|---------|
 | 0x01 | HELLO  | tablet → host | JSON `{"protocol":2,"device":"samsung SM-X510","width":2304,"height":1440,"dpi":280,"refreshRate":90,"paired":true}` |
-| 0x02 | CONFIG | host → tablet | JSON `{"protocol":2,"codec":"h264","maxWidth":2304,"maxHeight":1440,"fps":60}` |
+| 0x02 | CONFIG | host → tablet | JSON `{"protocol":2,"codec":"h264","maxWidth":2304,"maxHeight":1440,"fps":60}`; opcional `"notice":"..."` |
 | 0x03 | PAIR_REQUIRED | host → tablet | JSON `{"host":"ALEXP-PC"}` (solo WiFi) |
 | 0x04 | PAIR | tablet → host | JSON `{"proof":"<hex>"}` |
 | 0x05 | PAIR_RESULT | host → tablet | JSON `{"ok":false,"error":"Código incorrecto.","retry":true}` |
@@ -158,6 +158,9 @@ y la red tiene que estar marcada como Privada.
 2. El host valida la versión y responde **CONFIG**. El video se escala para entrar en
    `maxWidth × maxHeight` conservando el aspecto, **sin agrandar**; el tamaño real lo
    informa el decoder (`INFO_OUTPUT_FORMAT_CHANGED`).
+   `notice` (opcional, se omite si no hay) es un texto para mostrarle al usuario; hoy lo usa el host
+   cuando la sesión sale en espejo porque el monitor virtual no está disponible (driver caído o no
+   instalado). Las apps anteriores a la 0.6.0 lo ignoran, así que no cambia la versión del protocolo.
 3. El host envía un VIDEO de configuración (SPS/PPS) y luego frames, empezando por un keyframe.
 4. La tablet envía PING cada segundo para medir el RTT, y POINTER con cada toque o movimiento del lápiz.
 5. Cualquiera de los dos puede cerrar el socket para terminar la sesión.
